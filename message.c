@@ -464,7 +464,7 @@ parse_packet(const unsigned char *from, struct interface *ifp,
             }
         } else if(type == MESSAGE_UPDATE) {
             unsigned char prefix[16], src_prefix[16], *nh;
-            unsigned char plen, src_plen;
+            unsigned char ae, real_plen, plen, src_plen, omitted, flags;
             unsigned char channels[MAX_CHANNEL_HOPS];
             int channels_len = MAX_CHANNEL_HOPS;
             unsigned short interval, seqno, metric;
@@ -474,18 +474,20 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                     have_v4_prefix = have_v6_prefix = 0;
                 goto fail;
             }
+            ae = message[2];
+            flags = message[3];
+            real_plen = message[4];
+            omitted = message[5];
             DO_NTOHS(interval, message + 6);
             DO_NTOHS(seqno, message + 8);
             DO_NTOHS(metric, message + 10);
-            if(message[5] == 0 ||
-               (message[2] == 1 ? have_v4_prefix : have_v6_prefix))
-                rc = network_prefix(message[2], message[4], message[5],
-                                    message + 12,
-                                    message[2] == 1 ? v4_prefix : v6_prefix,
+            if(omitted == 0 || (ae == 1 ? have_v4_prefix : have_v6_prefix))
+                rc = network_prefix(ae, real_plen, omitted, message + 12,
+                                    ae == 1 ? v4_prefix : v6_prefix,
                                     len - 10, prefix);
             else
                 rc = -1;
-            if(message[2] == 1) {
+            if(ae == 1) {
                 v4tov6(src_prefix, zeroes);
                 src_plen = 96;
             } else {
@@ -493,16 +495,16 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                 src_plen = 0;
             }
             if(rc < 0) {
-                if(message[3] & 0x80)
+                if(flags & 0x80)
                     have_v4_prefix = have_v6_prefix = 0;
                 goto fail;
             }
             parsed_len = 10 + rc;
 
-            plen = message[4] + (message[2] == 1 ? 96 : 0);
+            plen = real_plen + (ae == 1 ? 96 : 0);
 
-            if(message[3] & 0x80) {
-                if(message[2] == 1) {
+            if(flags & 0x80) {
+                if(ae == 1) {
                     memcpy(v4_prefix, prefix, 16);
                     have_v4_prefix = 1;
                 } else {
@@ -510,8 +512,8 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                     have_v6_prefix = 1;
                 }
             }
-            if(message[3] & 0x40) {
-                if(message[2] == 1) {
+            if(flags & 0x40) {
+                if(ae == 1) {
                     memset(router_id, 0, 4);
                     memcpy(router_id + 4, prefix + 12, 4);
                 } else {
@@ -519,17 +521,17 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                 }
                 have_router_id = 1;
             }
-            if(!have_router_id && message[2] != 0) {
+            if(!have_router_id && ae != 0) {
                 fprintf(stderr, "Received prefix with no router id.\n");
                 goto fail;
             }
             debugf("Received update%s%s for %s from %s on %s.\n",
-                   (message[3] & 0x80) ? "/prefix" : "",
-                   (message[3] & 0x40) ? "/id" : "",
+                   (flags & 0x80) ? "/prefix" : "",
+                   (flags & 0x40) ? "/id" : "",
                    format_prefix(prefix, plen),
                    format_address(from), ifp->name);
 
-            if(message[2] == 0) {
+            if(ae == 0) {
                 if(metric < 0xFFFF) {
                     fprintf(stderr,
                             "Received wildcard update with finite metric.\n");
@@ -537,7 +539,7 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                 }
                 retract_neighbour_routes(neigh);
                 goto done;
-            } else if(message[2] == 1) {
+            } else if(ae == 1) {
                 if(!have_v4_nh)
                     goto fail;
                 nh = v4_nh;
@@ -547,7 +549,7 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                 nh = neigh->address;
             }
 
-            if(message[2] == 1) {
+            if(ae == 1) {
                 if(!ifp->ipv4)
                     goto done;
             }
