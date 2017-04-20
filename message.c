@@ -287,7 +287,7 @@ parse_ihu_subtlv(const unsigned char *a, int alen,
 }
 
 static int
-parse_other_subtlv(const unsigned char *a, int alen)
+parse_other_subtlv(const unsigned char *a, int alen, const char *tlv_name)
 {
     int type, len, i = 0;
 
@@ -309,7 +309,8 @@ parse_other_subtlv(const unsigned char *a, int alen)
         }
 
         if((type & 0x80) != 0) {
-            debugf("Received unknown mandatory sub-TLV %d.\n", type);
+            debugf("Received unknown mandatory %s sub-TLV %d.\n", tlv_name,
+                   type);
             return -1;
         }
 
@@ -411,7 +412,7 @@ parse_packet(const unsigned char *from, struct interface *ifp,
             DO_NTOHS(interval, message + 6);
             debugf("Received ack-req (%04X %d) from %s on %s.\n",
                    nonce, interval, format_address(from), ifp->name);
-            rc = parse_other_subtlv(message + 8, len - 6);
+            rc = parse_other_subtlv(message + 8, len - 6, "PadN");
             if(rc < 0)
                 goto done;
             send_ack(neigh, nonce, interval);
@@ -419,7 +420,7 @@ parse_packet(const unsigned char *from, struct interface *ifp,
             int rc;
             debugf("Received ack from %s on %s.\n",
                    format_address(from), ifp->name);
-            rc = parse_other_subtlv(message + 4, len - 2);
+            rc = parse_other_subtlv(message + 4, len - 2, "Ack");
             if(rc < 0)
                 goto done;
             /* Nothing right now */
@@ -487,7 +488,7 @@ parse_packet(const unsigned char *from, struct interface *ifp,
             have_router_id = 1;
             debugf("Received router-id %s from %s on %s.\n",
                    format_eui64(router_id), format_address(from), ifp->name);
-            rc = parse_other_subtlv(message + 12, len - 10);
+            rc = parse_other_subtlv(message + 12, len - 10, "Router ID");
             if(rc < 0)
                 goto done;
         } else if(type == MESSAGE_NH) {
@@ -515,7 +516,7 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                 memcpy(v6_nh, nh, 16);
                 have_v6_nh = 1;
             }
-            rc = parse_other_subtlv(message + 4 + rc, len - 2 - rc);
+            rc = parse_other_subtlv(message + 4 + rc, len - 2 - rc, "Next Hop");
             if(rc < 0)
                 goto done;
         } else if(type == MESSAGE_UPDATE) {
@@ -588,7 +589,7 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                    format_address(from), ifp->name);
 
             if(ae == 0) {
-                rc = parse_other_subtlv(message + 12, len - 10);
+                rc = parse_other_subtlv(message + 12, len - 10, "Update");
                 if(rc < 0)
                     goto done;
                 if(metric < 0xFFFF) {
@@ -632,7 +633,7 @@ parse_packet(const unsigned char *from, struct interface *ifp,
             debugf("Received request for %s from %s on %s.\n",
                    message[2] == 0 ? "any" : format_prefix(prefix, plen),
                    format_address(from), ifp->name);
-            rc = parse_other_subtlv(message + 4 + rc, len - 2 - rc);
+            rc = parse_other_subtlv(message + 4 + rc, len - 2 - rc, "Request");
             if(rc < 0)
                 goto done;
             if(message[2] == 0) {
@@ -665,7 +666,8 @@ parse_packet(const unsigned char *from, struct interface *ifp,
             rc = network_prefix(message[2], message[3], 0,
                                 message + 16, NULL, len - 14, prefix);
             if(rc < 0) goto fail;
-            rc = parse_other_subtlv(message + 16 + rc, len - 14 - rc);
+            rc = parse_other_subtlv(message + 16 + rc, len - 14 - rc,
+                                    "Seqno Request");
             if(rc < 0)
                 goto done;
             plen = message[3] + (message[2] == 1 ? 96 : 0);
@@ -733,7 +735,7 @@ parse_packet(const unsigned char *from, struct interface *ifp,
 
             if(ae == 0) {
                 debugf("Received invalid Source-Specific wildcard update.\n");
-                rc = parse_other_subtlv(message + 12, len - 10);
+                rc = parse_other_subtlv(message + 12, len - 10, "SS Update");
                 if(rc < 0)
                     goto done;
                 retract_neighbour_routes(neigh);
@@ -780,7 +782,8 @@ parse_packet(const unsigned char *from, struct interface *ifp,
             if(ae == 1)
                 src_plen += 96;
             parsed += rc;
-            rc = parse_other_subtlv(message + parsed, len - parsed + 2);
+            rc = parse_other_subtlv(message + parsed, len - parsed + 2,
+                                    "SS Request");
             if(rc < 0)
                 goto done;
             if(ae == 0) {
@@ -821,7 +824,8 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                                 NULL, len + 2 - parsed, src_prefix);
             if(rc < 0) goto fail;
             parsed += rc;
-            rc = parse_other_subtlv(message + parsed, len - parsed + 2);
+            rc = parse_other_subtlv(message + parsed, len - parsed + 2,
+                                    "SS Seqno Request");
             if(rc < 0)
                 goto done;
             if(ae == 1)
