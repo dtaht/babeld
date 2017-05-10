@@ -610,7 +610,7 @@ parse_packet(const unsigned char *from, struct interface *ifp,
 
             rc = parse_update_subtlv(ifp, metric, message + 2 + parsed_len,
                                      len - parsed_len, channels, &channels_len);
-            if (rc < 0)
+            if(rc < 0)
                 goto done;
 
             if(ae == 1) {
