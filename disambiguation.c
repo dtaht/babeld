@@ -263,6 +263,20 @@ chg_route_metric(const struct zone *zone, const struct babel_route *route,
                         new_metric, table);
 }
 
+static int
+not_any_specific_route(void) {
+    struct route_stream *stream = NULL;
+    int no_route;
+    stream = route_stream(ROUTE_SS_INSTALLED);
+    if(!stream) {
+        fprintf(stderr, "Couldn't allocate route stream.\n");
+        return -1;
+    }
+    no_route = (route_stream_next(stream) != NULL);
+    route_stream_done(stream);
+    return no_route;
+}
+
 int
 kinstall_route(const struct babel_route *route)
 {
@@ -276,19 +290,21 @@ kinstall_route(const struct babel_route *route)
     debugf("install_route(%s from %s)\n",
            format_prefix(route->src->prefix, route->src->plen),
            format_prefix(route->src->src_prefix, route->src->src_plen));
-    /* Install source-specific conflicting routes */
-    if(kernel_disambiguate(v4)) {
+    if(kernel_disambiguate(v4) ||
+       (is_default(route->src->src_prefix, route->src->src_plen) &&
+        not_any_specific_route())) {
+        /* no disambiguation */
         to_zone(route, &zone);
         rc = add_route(&zone, route);
         goto end;
     }
 
+    /* Install completion routes */
     stream = route_stream(ROUTE_INSTALLED);
     if(!stream) {
         fprintf(stderr, "Couldn't allocate route stream.\n");
         return -1;
     }
-    /* Install source-specific conflicting routes */
     while(1) {
         rt1 = route_stream_next(stream);
         if(rt1 == NULL) break;
@@ -306,7 +322,7 @@ kinstall_route(const struct babel_route *route)
     }
     route_stream_done(stream);
 
-    /* Non conflicting case */
+    /* Install the route, or change if the route solve a conflict. */
     to_zone(route, &zone);
     rt1 = conflict_solution(route);
     if(rt1 == NULL)
@@ -336,7 +352,10 @@ kuninstall_route(const struct babel_route *route)
            format_prefix(route->src->prefix, route->src->plen),
            format_prefix(route->src->src_prefix, route->src->src_plen));
     to_zone(route, &zone);
-    if(kernel_disambiguate(v4)) {
+    if(kernel_disambiguate(v4) ||
+       (is_default(route->src->src_prefix, route->src->src_plen) &&
+        not_any_specific_route())) {
+        /* no disambiguation */
         rc = del_route(&zone, route);
         if(rc < 0)
             perror("kernel_route(FLUSH)");
@@ -351,7 +370,7 @@ kuninstall_route(const struct babel_route *route)
     if(rc < 0)
         perror("kernel_route(FLUSH)");
 
-    /* Remove source-specific conflicting routes */
+    /* Remove completion routes */
     stream = route_stream(ROUTE_INSTALLED);
     if(!stream) {
         fprintf(stderr, "Couldn't allocate route stream.\n");
@@ -395,8 +414,9 @@ kswitch_routes(const struct babel_route *old, const struct babel_route *new)
         return -1;
     }
 
-    /* Remove source-specific conflicting routes */
-    if(!kernel_disambiguate(v4mapped(old->nexthop))) {
+    /* switch completion routes */
+    if(!kernel_disambiguate(v4mapped(old->nexthop)) &&
+       !not_any_specific_route()) {
         stream = route_stream(ROUTE_INSTALLED);
         if(!stream) {
             fprintf(stderr, "Couldn't allocate route stream.\n");
@@ -443,7 +463,9 @@ kchange_route_metric(const struct babel_route *route,
         return -1;
     }
 
-    if(!kernel_disambiguate(v4mapped(route->nexthop))) {
+    /* change completion routes */
+    if(!kernel_disambiguate(v4mapped(route->nexthop)) &&
+       !not_any_specific_route()) {
         stream = route_stream(ROUTE_INSTALLED);
         if(!stream) {
             fprintf(stderr, "Couldn't allocate route stream.\n");
