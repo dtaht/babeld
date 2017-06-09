@@ -238,9 +238,10 @@ check_sources_released(void)
         struct source *src = sources[i];
 
         if(src->route_count != 0)
-            fprintf(stderr, "Warning: source %s %s has refcount %d.\n",
+            fprintf(stderr, "Warning: source %s (%s,%s) has refcount %d.\n",
                     format_eui64(src->id),
                     format_prefix(src->prefix, src->plen),
+                    format_prefix(src->src_prefix, src->src_plen),
                     (int)src->route_count);
     }
 }
