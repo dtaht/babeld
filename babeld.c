@@ -1058,6 +1058,7 @@ dump_route(FILE *out, struct babel_route *route)
         memcmp(route->nexthop, route->neigh->address, 16) == 0 ?
         NULL : route->nexthop;
     char channels[100];
+    int is_ss = !is_default(route->src->src_prefix, route->src->src_plen);
 
     if(route->channels_len == 0) {
         channels[0] = '\0';
@@ -1077,8 +1078,8 @@ dump_route(FILE *out, struct babel_route *route)
     fprintf(out, "%s%s%s metric %d (%d) refmetric %d id %s "
             "seqno %d%s age %d via %s neigh %s%s%s%s\n",
             format_prefix(route->src->prefix, route->src->plen),
-            route->src->src_plen > 0 ? " from " : "",
-            route->src->src_plen > 0 ?
+            is_ss ? " from " : "",
+            is_ss ?
             format_prefix(route->src->src_prefix, route->src->src_plen) : "",
             route_metric(route), route_smoothed_metric(route), route->refmetric,
             format_eui64(route->src->id),
@@ -1096,11 +1097,11 @@ dump_route(FILE *out, struct babel_route *route)
 static void
 dump_xroute(FILE *out, struct xroute *xroute)
 {
+    int is_ss = !is_default(xroute->src_prefix, xroute->src_plen);
     fprintf(out, "%s%s%s metric %d (exported)\n",
             format_prefix(xroute->prefix, xroute->plen),
-            xroute->src_plen > 0 ? " from " : "",
-            xroute->src_plen > 0 ?
-            format_prefix(xroute->src_prefix, xroute->src_plen) : "",
+            is_ss ? " from " : "",
+            is_ss ? format_prefix(xroute->src_prefix, xroute->src_plen) : "",
             xroute->metric);
 }
 

@@ -1148,6 +1148,7 @@ print_kernel_route(int add, int protocol, int type,
     char addr_prefix[INET6_ADDRSTRLEN];
     char src_addr_prefix[INET6_ADDRSTRLEN];
     char addr_gw[INET6_ADDRSTRLEN];
+    int is_ss = !is_default(route->src_prefix, route->src_plen);
 
     if(!inet_ntop(AF_INET6, route->prefix,
                   addr_prefix, sizeof(addr_prefix)) ||
@@ -1157,18 +1158,19 @@ print_kernel_route(int add, int protocol, int type,
         return;
     }
 
-    if(route->src_plen >= 0) {
+    if(is_ss) {
         if(!inet_ntop(AF_INET6, route->src_prefix,
                       src_addr_prefix, sizeof(src_addr_prefix))) {
             kdebugf("Couldn't format kernel route for printing.");
             return;
         }
 
-        kdebugf("%s kernel route: dest: %s/%d gw: %s metric: %d if: %s "
-                "(proto: %d, type: %d, from: %s/%d)",
+        kdebugf("%s kernel route: dest: %s/%d src: %s/%d gw: %s metric: %d "
+                "if: %s (proto: %d, type: %d)",
                 add == RTM_NEWROUTE ? "Add" : "Delete",
-                addr_prefix, route->plen, addr_gw, route->metric, ifname,
-                protocol, type, src_addr_prefix, route->src_plen);
+                addr_prefix, route->plen, addr_gw, route->metric,
+                src_addr_prefix, route->src_plen
+                ifname, protocol, type);
         return;
     }
 
