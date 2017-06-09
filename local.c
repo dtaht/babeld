@@ -231,10 +231,10 @@ local_notify_route_1(struct local_socket *s, struct babel_route *route, int kind
 {
     char buf[512];
     int rc;
-    const char *dst_prefix = format_prefix(route->src->prefix,
-                                           route->src->plen);
-    const char *src_prefix = format_prefix(route->src->src_prefix,
-                                           route->src->src_plen);
+    const char *dst_prefix = format_prefix(route->src->dt.prefix,
+                                           route->src->dt.plen);
+    const char *src_prefix = format_prefix(route->src->dt.src_prefix,
+                                           route->src->dt.src_plen);
 
     rc = snprintf(buf, 512,
                   "%s route %lx prefix %s from %s installed %s "

@@ -1058,7 +1058,7 @@ dump_route(FILE *out, struct babel_route *route)
         memcmp(route->nexthop, route->neigh->address, 16) == 0 ?
         NULL : route->nexthop;
     char channels[100];
-    int is_ss = !is_default(route->src->src_prefix, route->src->src_plen);
+    int is_ss = !is_default(route->src->dt.src_prefix, route->src->dt.src_plen);
 
     if(route->channels_len == 0) {
         channels[0] = '\0';
@@ -1077,10 +1077,10 @@ dump_route(FILE *out, struct babel_route *route)
 
     fprintf(out, "%s%s%s metric %d (%d) refmetric %d id %s "
             "seqno %d%s age %d via %s neigh %s%s%s%s\n",
-            format_prefix(route->src->prefix, route->src->plen),
+            format_prefix(route->src->dt.prefix, route->src->dt.plen),
             is_ss ? " from " : "",
-            is_ss ?
-            format_prefix(route->src->src_prefix, route->src->src_plen) : "",
+            is_ss ? format_prefix(route->src->dt.src_prefix,
+                                  route->src->dt.src_plen) : "",
             route_metric(route), route_smoothed_metric(route), route->refmetric,
             format_eui64(route->src->id),
             (int)route->seqno,

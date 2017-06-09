@@ -1457,9 +1457,9 @@ flushupdates(struct interface *ifp)
                     route_metric_noninterfering(route);
 
                 if(metric < INFINITY)
-                    satisfy_request(route->src->prefix, route->src->plen,
-                                    route->src->src_prefix,
-                                    route->src->src_plen,
+                    satisfy_request(route->src->dt.prefix, route->src->dt.plen,
+                                    route->src->dt.src_prefix,
+                                    route->src->dt.src_plen,
                                     seqno, route->src->id, ifp);
 
                 if((ifp->flags & IF_SPLIT_HORIZON) &&
@@ -1484,15 +1484,16 @@ flushupdates(struct interface *ifp)
                 }
 
                 really_send_update(ifp, route->src->id,
-                                   route->src->prefix, route->src->plen,
-                                   route->src->src_prefix, route->src->src_plen,
+                                   route->src->dt.prefix, route->src->dt.plen,
+                                   route->src->dt.src_prefix,
+                                   route->src->dt.src_plen,
                                    seqno, metric,
                                    channels, chlen);
                 update_source(route->src, seqno, metric);
-                last_prefix = route->src->prefix;
-                last_plen = route->src->plen;
-                last_src_prefix = route->src->src_prefix;
-                last_src_plen = route->src->src_plen;
+                last_prefix = route->src->dt.prefix;
+                last_plen = route->src->dt.plen;
+                last_src_prefix = route->src->dt.src_prefix;
+                last_src_plen = route->src->dt.src_plen;
             } else {
             /* There's no route for this prefix.  This can happen shortly
                after an xroute has been retracted, so send a retraction. */
@@ -1604,12 +1605,13 @@ send_update(struct interface *ifp, int urgent,
                 struct babel_route *route = route_stream_next(routes);
                 if(route == NULL)
                     break;
-                is_ss = !is_default(route->src->src_prefix,
-                                    route->src->src_plen);
+                is_ss = !is_default(route->src->dt.src_prefix,
+                                    route->src->dt.src_plen);
                 if((src_prefix && is_ss) || (prefix && !is_ss))
                     continue;
-                buffer_update(ifp, route->src->prefix, route->src->plen,
-                              route->src->src_prefix, route->src->src_plen);
+                buffer_update(ifp, route->src->dt.prefix, route->src->dt.plen,
+                              route->src->dt.src_prefix,
+                              route->src->dt.src_plen);
             }
             route_stream_done(routes);
         } else {

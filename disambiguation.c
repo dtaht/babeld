@@ -49,7 +49,7 @@ static int
 rt_cmp(const struct babel_route *rt1, const struct babel_route *rt2)
 {
     enum prefix_status dst_st, src_st;
-    const struct source *r1 = rt1->src, *r2 = rt2->src;
+    const struct datum *r1 = &rt1->src->dt, *r2 = &rt2->src->dt;
     dst_st = prefix_cmp(r1->prefix, r1->plen, r2->prefix, r2->plen);
     if(dst_st == PST_MORE_SPECIFIC)
         return -1;
@@ -78,7 +78,7 @@ static int
 conflicts(const struct babel_route *rt, const struct babel_route *rt1)
 {
     enum prefix_status dst_st, src_st;
-    const struct source *r = rt->src, *r1 = rt1->src;
+    const struct datum *r = &rt->src->dt, *r1 = &rt1->src->dt;
     dst_st = prefix_cmp(r->prefix, r->plen, r1->prefix, r1->plen);
     if(dst_st == PST_DISJOINT || dst_st == PST_EQUALS)
         return 0;
@@ -91,10 +91,10 @@ conflicts(const struct babel_route *rt, const struct babel_route *rt1)
 static const struct zone*
 to_zone(const struct babel_route *rt, struct zone *zone)
 {
-    zone->dst_prefix = rt->src->prefix;
-    zone->dst_plen = rt->src->plen;
-    zone->src_prefix = rt->src->src_prefix;
-    zone->src_plen = rt->src->src_plen;
+    zone->dst_prefix = rt->src->dt.prefix;
+    zone->dst_plen = rt->src->dt.plen;
+    zone->src_prefix = rt->src->dt.src_prefix;
+    zone->src_plen = rt->src->dt.src_plen;
     return zone;
 }
 
@@ -105,7 +105,7 @@ inter(const struct babel_route *rt, const struct babel_route *rt1,
       struct zone *zone)
 {
     enum prefix_status dst_st, src_st;
-    const struct source *r = rt->src, *r1 = rt1->src;
+    const struct datum *r = &rt->src->dt, *r1 = &rt1->src->dt;
     dst_st = prefix_cmp(r->prefix, r->plen, r1->prefix, r1->plen);
     if(dst_st == PST_DISJOINT)
         return NULL;
@@ -288,10 +288,10 @@ kinstall_route(const struct babel_route *route)
     int v4 = v4mapped(route->nexthop);
 
     debugf("install_route(%s from %s)\n",
-           format_prefix(route->src->prefix, route->src->plen),
-           format_prefix(route->src->src_prefix, route->src->src_plen));
+           format_prefix(route->src->dt.prefix, route->src->dt.plen),
+           format_prefix(route->src->dt.src_prefix, route->src->dt.src_plen));
     if(kernel_disambiguate(v4) ||
-       (is_default(route->src->src_prefix, route->src->src_plen) &&
+       (is_default(route->src->dt.src_prefix, route->src->dt.src_plen) &&
         not_any_specific_route())) {
         /* no disambiguation */
         to_zone(route, &zone);
@@ -349,11 +349,11 @@ kuninstall_route(const struct babel_route *route)
     int v4 = v4mapped(route->nexthop);
 
     debugf("uninstall_route(%s from %s)\n",
-           format_prefix(route->src->prefix, route->src->plen),
-           format_prefix(route->src->src_prefix, route->src->src_plen));
+           format_prefix(route->src->dt.prefix, route->src->dt.plen),
+           format_prefix(route->src->dt.src_prefix, route->src->dt.src_plen));
     to_zone(route, &zone);
     if(kernel_disambiguate(v4) ||
-       (is_default(route->src->src_prefix, route->src->src_plen) &&
+       (is_default(route->src->dt.src_prefix, route->src->dt.src_plen) &&
         not_any_specific_route())) {
         /* no disambiguation */
         rc = del_route(&zone, route);
@@ -405,8 +405,8 @@ kswitch_routes(const struct babel_route *old, const struct babel_route *new)
     struct route_stream *stream = NULL;
 
     debugf("switch_routes(%s from %s)\n",
-           format_prefix(old->src->prefix, old->src->plen),
-           format_prefix(old->src->src_prefix, old->src->src_plen));
+           format_prefix(old->src->dt.prefix, old->src->dt.plen),
+           format_prefix(old->src->dt.src_prefix, old->src->dt.src_plen));
     to_zone(old, &zone);
     rc = chg_route(&zone, old, new);
     if(rc < 0) {
@@ -453,8 +453,8 @@ kchange_route_metric(const struct babel_route *route,
     struct zone zone;
 
     debugf("change_route_metric(%s from %s, %d -> %d)\n",
-           format_prefix(route->src->prefix, route->src->plen),
-           format_prefix(route->src->src_prefix, route->src->src_plen),
+           format_prefix(route->src->dt.prefix, route->src->dt.plen),
+           format_prefix(route->src->dt.src_prefix, route->src->dt.src_plen),
            old_metric, new_metric);
     to_zone(route, &zone);
     rc = chg_route_metric(&zone, route, old_metric, new_metric);

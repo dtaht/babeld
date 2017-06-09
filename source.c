@@ -47,21 +47,21 @@ source_compare(const unsigned char *id,
     if(rc != 0)
         return rc;
 
-    if(plen < src->plen)
+    if(plen < src->dt.plen)
         return -1;
-    if(plen > src->plen)
+    if(plen > src->dt.plen)
         return 1;
 
-    rc = memcmp(prefix, src->prefix, 16);
+    rc = memcmp(prefix, src->dt.prefix, 16);
     if(rc != 0)
         return rc;
 
-    if(src_plen < src->src_plen)
+    if(src_plen < src->dt.src_plen)
         return -1;
-    if(src_plen > src->src_plen)
+    if(src_plen > src->dt.src_plen)
         return 1;
 
-    rc = memcmp(src_prefix, src->src_prefix, 16);
+    rc = memcmp(src_prefix, src->dt.src_prefix, 16);
     if(rc != 0)
         return rc;
 
@@ -144,10 +144,10 @@ find_source(const unsigned char *id,
     }
 
     memcpy(src->id, id, 8);
-    memcpy(src->prefix, prefix, 16);
-    src->plen = plen;
-    memcpy(src->src_prefix, src_prefix, 16);
-    src->src_plen = src_plen;
+    memcpy(src->dt.prefix, prefix, 16);
+    src->dt.plen = plen;
+    memcpy(src->dt.src_prefix, src_prefix, 16);
+    src->dt.src_plen = src_plen;
     src->seqno = seqno;
     src->metric = INFINITY;
     src->time = now.tv_sec;
@@ -240,8 +240,8 @@ check_sources_released(void)
         if(src->route_count != 0)
             fprintf(stderr, "Warning: source %s (%s,%s) has refcount %d.\n",
                     format_eui64(src->id),
-                    format_prefix(src->prefix, src->plen),
-                    format_prefix(src->src_prefix, src->src_plen),
+                    format_prefix(src->dt.prefix, src->dt.plen),
+                    format_prefix(src->dt.src_prefix, src->dt.src_plen),
                     (int)src->route_count);
     }
 }

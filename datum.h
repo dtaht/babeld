@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2007, 2008 by Juliusz Chroboczek
+Copyright (c) 20017 by Matthieu Boutier and Juliusz Chroboczek
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,28 +20,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#define SOURCE_GC_TIME 200
+#ifndef DATUM_H
+#define DATUM_H
 
-#include "datum.h"
-
-struct source {
-    unsigned char id[8];
-    struct datum dt;
-    unsigned short seqno;
-    unsigned short metric;
-    unsigned short route_count;
-    time_t time;
+struct datum {
+    unsigned char prefix[16];
+    unsigned char plen;
+    unsigned char src_prefix[16];
+    unsigned char src_plen;
 };
 
-struct source *find_source(const unsigned char *id,
-                           const unsigned char *prefix,
-                           unsigned char plen,
-                           const unsigned char *src_prefix,
-                           unsigned char src_plen,
-                           int create, unsigned short seqno);
-struct source *retain_source(struct source *src);
-void release_source(struct source *src);
-void update_source(struct source *src,
-                   unsigned short seqno, unsigned short metric);
-void expire_sources(void);
-void check_sources_released(void);
+#endif /* DATUM_H */
