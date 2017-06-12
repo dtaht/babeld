@@ -1337,37 +1337,37 @@ compare_buffered_updates(const void *av, const void *bv)
     if(rc != 0)
         return rc;
 
-    v4a = (a->plen >= 96 && v4mapped(a->prefix));
-    v4b = (b->plen >= 96 && v4mapped(b->prefix));
+    v4a = (a->dt.plen >= 96 && v4mapped(a->dt.prefix));
+    v4b = (b->dt.plen >= 96 && v4mapped(b->dt.prefix));
 
     if(v4a > v4b)
         return 1;
     else if(v4a < v4b)
         return -1;
 
-    ma = (!v4a && a->plen == 128 && memcmp(a->prefix + 8, a->id, 8) == 0);
-    mb = (!v4b && b->plen == 128 && memcmp(b->prefix + 8, b->id, 8) == 0);
+    ma = (!v4a && a->dt.plen == 128 && memcmp(a->dt.prefix + 8, a->id, 8) == 0);
+    mb = (!v4b && b->dt.plen == 128 && memcmp(b->dt.prefix + 8, b->id, 8) == 0);
 
     if(ma > mb)
         return -1;
     else if(mb > ma)
         return 1;
 
-    if(a->plen < b->plen)
+    if(a->dt.plen < b->dt.plen)
         return 1;
-    else if(a->plen > b->plen)
+    else if(a->dt.plen > b->dt.plen)
         return -1;
 
-    rc = memcmp(a->prefix, b->prefix, 16);
+    rc = memcmp(a->dt.prefix, b->dt.prefix, 16);
     if(rc != 0)
         return rc;
 
-    if(a->src_plen < b->src_plen)
+    if(a->dt.src_plen < b->dt.src_plen)
         return -1;
-    else if(a->src_plen > b->src_plen)
+    else if(a->dt.src_plen > b->dt.src_plen)
         return 1;
 
-    return memcmp(a->src_prefix, b->src_prefix, 16);
+    return memcmp(a->dt.src_prefix, b->dt.src_prefix, 16);
 }
 
 void
@@ -1406,8 +1406,8 @@ flushupdates(struct interface *ifp)
            with the same router-id together, with IPv6 going out before IPv4. */
 
         for(i = 0; i < n; i++) {
-            route = find_installed_route(b[i].prefix, b[i].plen,
-                                         b[i].src_prefix, b[i].src_plen);
+            route = find_installed_route(b[i].dt.prefix, b[i].dt.plen,
+                                         b[i].dt.src_prefix, b[i].dt.src_plen);
             if(route)
                 memcpy(b[i].id, route->src->id, 8);
             else
@@ -1422,16 +1422,16 @@ flushupdates(struct interface *ifp)
                compare with the previous update. */
 
             if(last_prefix &&
-               b[i].plen == last_plen &&
-               b[i].src_plen == last_src_plen &&
-               memcmp(b[i].prefix, last_prefix, 16) == 0 &&
-               memcmp(b[i].src_prefix, last_src_prefix, 16) == 0)
+               b[i].dt.plen == last_plen &&
+               b[i].dt.src_plen == last_src_plen &&
+               memcmp(b[i].dt.prefix, last_prefix, 16) == 0 &&
+               memcmp(b[i].dt.src_prefix, last_src_prefix, 16) == 0)
                 continue;
 
-            xroute = find_xroute(b[i].prefix, b[i].plen,
-                                 b[i].src_prefix, b[i].src_plen);
-            route = find_installed_route(b[i].prefix, b[i].plen,
-                                         b[i].src_prefix, b[i].src_plen);
+            xroute = find_xroute(b[i].dt.prefix, b[i].dt.plen,
+                                 b[i].dt.src_prefix, b[i].dt.src_plen);
+            route = find_installed_route(b[i].dt.prefix, b[i].dt.plen,
+                                         b[i].dt.src_prefix, b[i].dt.src_plen);
 
             if(xroute && (!route || xroute->metric <= kernel_metric)) {
                 really_send_update(ifp, myid,
@@ -1497,8 +1497,8 @@ flushupdates(struct interface *ifp)
             } else {
             /* There's no route for this prefix.  This can happen shortly
                after an xroute has been retracted, so send a retraction. */
-                really_send_update(ifp, myid, b[i].prefix, b[i].plen,
-                                   b[i].src_prefix, b[i].src_plen,
+                really_send_update(ifp, myid, b[i].dt.prefix, b[i].dt.plen,
+                                   b[i].dt.src_prefix, b[i].dt.src_plen,
                                    myseqno, INFINITY, NULL, -1);
             }
         }
@@ -1553,12 +1553,12 @@ buffer_update(struct interface *ifp,
         ifp->num_buffered_updates = 0;
     }
 
-    memcpy(ifp->buffered_updates[ifp->num_buffered_updates].prefix,
+    memcpy(ifp->buffered_updates[ifp->num_buffered_updates].dt.prefix,
            prefix, 16);
-    ifp->buffered_updates[ifp->num_buffered_updates].plen = plen;
-    memcpy(ifp->buffered_updates[ifp->num_buffered_updates].src_prefix,
+    ifp->buffered_updates[ifp->num_buffered_updates].dt.plen = plen;
+    memcpy(ifp->buffered_updates[ifp->num_buffered_updates].dt.src_prefix,
            src_prefix, 16);
-    ifp->buffered_updates[ifp->num_buffered_updates].src_plen = src_plen;
+    ifp->buffered_updates[ifp->num_buffered_updates].dt.src_plen = src_plen;
     ifp->num_buffered_updates++;
 }
 
