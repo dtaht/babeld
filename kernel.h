@@ -22,14 +22,12 @@ THE SOFTWARE.
 
 #include <netinet/in.h>
 #include "babeld.h"
+#include "datum.h"
 
 #define KERNEL_INFINITY 0xFFFF
 
 struct kernel_route {
-    unsigned char prefix[16];
-    int plen;
-    unsigned char src_prefix[16];
-    int src_plen;
+    struct datum dt;
     int metric;
     unsigned int ifindex;
     int proto;

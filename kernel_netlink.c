@@ -1095,9 +1095,9 @@ parse_kernel_route_rta(struct rtmsg *rtm, int len, struct kernel_route *route)
     if(rtm->rtm_family == AF_INET) {
         /* if RTA_DST is not a TLV, that's a default destination */
         const unsigned char zeroes[4] = {0, 0, 0, 0};
-        v4tov6(route->prefix, zeroes);
-        v4tov6(route->src_prefix, zeroes);
-        route->plen = 96;
+        v4tov6(route->dt.prefix, zeroes);
+        v4tov6(route->dt.src_prefix, zeroes);
+        route->dt.plen = 96;
     }
     route->proto = rtm->rtm_protocol;
 
@@ -1106,12 +1106,12 @@ parse_kernel_route_rta(struct rtmsg *rtm, int len, struct kernel_route *route)
     while(RTA_OK(rta, len)) {
         switch(rta->rta_type) {
         case RTA_DST:
-            route->plen = GET_PLEN(rtm->rtm_dst_len, is_v4);
-            COPY_ADDR(route->prefix, rta, is_v4);
+            route->dt.plen = GET_PLEN(rtm->rtm_dst_len, is_v4);
+            COPY_ADDR(route->dt.prefix, rta, is_v4);
             break;
         case RTA_SRC:
-            route->src_plen = GET_PLEN(rtm->rtm_src_len, is_v4);
-            COPY_ADDR(route->src_prefix, rta, is_v4);
+            route->dt.src_plen = GET_PLEN(rtm->rtm_src_len, is_v4);
+            COPY_ADDR(route->dt.src_prefix, rta, is_v4);
             break;
         case RTA_GATEWAY:
             COPY_ADDR(route->gw, rta, is_v4);
@@ -1148,9 +1148,9 @@ print_kernel_route(int add, int protocol, int type,
     char addr_prefix[INET6_ADDRSTRLEN];
     char src_addr_prefix[INET6_ADDRSTRLEN];
     char addr_gw[INET6_ADDRSTRLEN];
-    int is_ss = !is_default(route->src_prefix, route->src_plen);
+    int is_ss = !is_default(route->dt.src_prefix, route->dt.src_plen);
 
-    if(!inet_ntop(AF_INET6, route->prefix,
+    if(!inet_ntop(AF_INET6, route->dt.prefix,
                   addr_prefix, sizeof(addr_prefix)) ||
        !inet_ntop(AF_INET6,route->gw, addr_gw, sizeof(addr_gw)) ||
        !if_indextoname(route->ifindex, ifname)) {
@@ -1159,7 +1159,7 @@ print_kernel_route(int add, int protocol, int type,
     }
 
     if(is_ss) {
-        if(!inet_ntop(AF_INET6, route->src_prefix,
+        if(!inet_ntop(AF_INET6, route->dt.src_prefix,
                       src_addr_prefix, sizeof(src_addr_prefix))) {
             kdebugf("Couldn't format kernel route for printing.");
             return;
@@ -1168,8 +1168,8 @@ print_kernel_route(int add, int protocol, int type,
         kdebugf("%s kernel route: dest: %s/%d src: %s/%d gw: %s metric: %d "
                 "if: %s (proto: %d, type: %d)",
                 add == RTM_NEWROUTE ? "Add" : "Delete",
-                addr_prefix, route->plen, addr_gw, route->metric,
-                src_addr_prefix, route->src_plen
+                addr_prefix, route->dt.plen, addr_gw, route->metric,
+                src_addr_prefix, route->dt.src_plen,
                 ifname, protocol, type);
         return;
     }
@@ -1177,7 +1177,7 @@ print_kernel_route(int add, int protocol, int type,
     kdebugf("%s kernel route: dest: %s/%d gw: %s metric: %d if: %s "
            "(proto: %d, type: %d)",
            add == RTM_NEWROUTE ? "Add" : "Delete",
-           addr_prefix, route->plen, addr_gw, route->metric, ifname,
+           addr_prefix, route->dt.plen, addr_gw, route->metric, ifname,
            protocol, type);
 }
 
@@ -1208,7 +1208,7 @@ filter_kernel_routes(struct nlmsghdr *nh, struct kernel_route *route)
         return 0;
 
     /* Ignore default unreachable routes; no idea where they come from. */
-    if(route->plen == 0 && route->metric >= KERNEL_INFINITY)
+    if(route->dt.plen == 0 && route->metric >= KERNEL_INFINITY)
         return 0;
 
     if(debug >= 2) {

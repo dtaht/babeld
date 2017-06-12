@@ -172,8 +172,8 @@ filter_route(struct kernel_route *route, void *data) {
     if(*found >= maxroutes)
         return -1;
 
-    if(martian_prefix(route->prefix, route->plen) ||
-       martian_prefix(route->src_prefix, route->src_plen))
+    if(martian_prefix(route->dt.prefix, route->dt.plen) ||
+       martian_prefix(route->dt.src_prefix, route->dt.src_plen))
         return 0;
 
     routes[*found] = *route;
@@ -217,8 +217,8 @@ filter_address(struct kernel_addr *addr, void *data) {
         return 0;
 
     route = &routes[*found];
-    memcpy(route->prefix, addr->addr.s6_addr, 16);
-    route->plen = 128;
+    memcpy(route->dt.prefix, addr->addr.s6_addr, 16);
+    route->dt.plen = 128;
     route->metric = 0;
     route->ifindex = addr->ifindex;
     route->proto = RTPROT_BABEL_LOCAL;
@@ -288,13 +288,13 @@ check_xroutes(int send_updates)
 
     for(i = numaddresses; i < numroutes; i++) {
         filter_result.src_prefix = NULL;
-        redistribute_filter(routes[i].prefix, routes[i].plen,
-                            routes[i].src_prefix, routes[i].src_plen,
+        redistribute_filter(routes[i].dt.prefix, routes[i].dt.plen,
+                            routes[i].dt.src_prefix, routes[i].dt.src_plen,
                             routes[i].ifindex, routes[i].proto,
                             &filter_result);
         if(filter_result.src_prefix) {
-            memcpy(routes[i].src_prefix, filter_result.src_prefix, 16);
-            routes[i].src_plen = filter_result.src_plen;
+            memcpy(routes[i].dt.src_prefix, filter_result.src_prefix, 16);
+            routes[i].dt.src_plen = filter_result.src_plen;
         }
 
     }
@@ -311,11 +311,11 @@ check_xroutes(int send_updates)
                                      NULL);
         if(metric < INFINITY && metric == xroutes[i].metric) {
             for(j = 0; j < numroutes; j++) {
-                if(xroutes[i].dt.plen == routes[j].plen &&
-                   xroutes[i].dt.src_plen == routes[j].src_plen &&
-                   memcmp(xroutes[i].dt.prefix, routes[j].prefix, 16) == 0 &&
+                if(xroutes[i].dt.plen == routes[j].dt.plen &&
+                   xroutes[i].dt.src_plen == routes[j].dt.src_plen &&
+                   memcmp(xroutes[i].dt.prefix, routes[j].dt.prefix, 16) == 0 &&
                    memcmp(xroutes[i].dt.src_prefix,
-                          routes[j].src_prefix, 16) == 0 &&
+                          routes[j].dt.src_prefix, 16) == 0 &&
                    xroutes[i].ifindex == routes[j].ifindex &&
                    xroutes[i].proto == routes[j].proto) {
                     export = 1;
@@ -349,20 +349,22 @@ check_xroutes(int send_updates)
     /* Add any new routes */
 
     for(i = 0; i < numroutes; i++) {
-        if(martian_prefix(routes[i].prefix, routes[i].plen))
+        if(martian_prefix(routes[i].dt.prefix, routes[i].dt.plen))
             continue;
-        metric = redistribute_filter(routes[i].prefix, routes[i].plen,
-                                     routes[i].src_prefix, routes[i].src_plen,
+        metric = redistribute_filter(routes[i].dt.prefix, routes[i].dt.plen,
+                                     routes[i].dt.src_prefix,
+                                     routes[i].dt.src_plen,
                                      routes[i].ifindex, routes[i].proto, NULL);
         if(metric < INFINITY) {
-            rc = add_xroute(routes[i].prefix, routes[i].plen,
-                            routes[i].src_prefix, routes[i].src_plen,
+            rc = add_xroute(routes[i].dt.prefix, routes[i].dt.plen,
+                            routes[i].dt.src_prefix, routes[i].dt.src_plen,
                             metric, routes[i].ifindex, routes[i].proto);
             if(rc > 0) {
                 struct babel_route *route;
-                route = find_installed_route(routes[i].prefix, routes[i].plen,
-                                             routes[i].src_prefix,
-                                             routes[i].src_plen);
+                route = find_installed_route(routes[i].dt.prefix,
+                                             routes[i].dt.plen,
+                                             routes[i].dt.src_prefix,
+                                             routes[i].dt.src_plen);
                 if(route) {
                     if(allow_duplicates < 0 ||
                        routes[i].metric < allow_duplicates)
@@ -370,8 +372,8 @@ check_xroutes(int send_updates)
                 }
                 change = 1;
                 if(send_updates)
-                    send_update(NULL, 0, routes[i].prefix, routes[i].plen,
-                                routes[i].src_prefix, routes[i].src_plen);
+                    send_update(NULL, 0, routes[i].dt.prefix, routes[i].dt.plen,
+                                routes[i].dt.src_prefix, routes[i].dt.src_plen);
             }
         }
     }

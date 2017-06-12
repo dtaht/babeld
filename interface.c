@@ -247,7 +247,7 @@ check_link_local_addresses(struct interface *ifp)
         if(rc == ifp->numll) {
             changed = 0;
             for(i = 0; i < rc; i++) {
-                if(memcmp(ifp->ll[i], ll[i].prefix, 16) != 0) {
+                if(memcmp(ifp->ll[i], ll[i].dt.prefix, 16) != 0) {
                     changed = 1;
                     break;
                 }
@@ -264,7 +264,7 @@ check_link_local_addresses(struct interface *ifp)
                 perror("malloc(ll)");
             } else {
                 for(i = 0; i < rc; i++)
-                    memcpy(ifp->ll[i], ll[i].prefix, 16);
+                    memcpy(ifp->ll[i], ll[i].dt.prefix, 16);
                 ifp->numll = rc;
             }
             local_notify_interface(ifp, LOCAL_CHANGE);
