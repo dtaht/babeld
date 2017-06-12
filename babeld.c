@@ -1097,11 +1097,12 @@ dump_route(FILE *out, struct babel_route *route)
 static void
 dump_xroute(FILE *out, struct xroute *xroute)
 {
-    int is_ss = !is_default(xroute->src_prefix, xroute->src_plen);
+    int is_ss = !is_default(xroute->dt.src_prefix, xroute->dt.src_plen);
     fprintf(out, "%s%s%s metric %d (exported)\n",
-            format_prefix(xroute->prefix, xroute->plen),
+            format_prefix(xroute->dt.prefix, xroute->dt.plen),
             is_ss ? " from " : "",
-            is_ss ? format_prefix(xroute->src_prefix, xroute->src_plen) : "",
+            is_ss ? format_prefix(xroute->dt.src_prefix, xroute->dt.src_plen) :
+            "",
             xroute->metric);
 }
 

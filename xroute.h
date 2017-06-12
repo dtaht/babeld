@@ -20,11 +20,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#include "datum.h"
+
 struct xroute {
-    unsigned char prefix[16];
-    unsigned char plen;
-    unsigned char src_prefix[16];
-    unsigned char src_plen;
+    struct datum dt;
     unsigned short metric;
     unsigned int ifindex;
     int proto;

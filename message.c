@@ -1435,14 +1435,14 @@ flushupdates(struct interface *ifp)
 
             if(xroute && (!route || xroute->metric <= kernel_metric)) {
                 really_send_update(ifp, myid,
-                                   xroute->prefix, xroute->plen,
-                                   xroute->src_prefix, xroute->src_plen,
+                                   xroute->dt.prefix, xroute->dt.plen,
+                                   xroute->dt.src_prefix, xroute->dt.src_plen,
                                    myseqno, xroute->metric,
                                    NULL, 0);
-                last_prefix = xroute->prefix;
-                last_plen = xroute->plen;
-                last_src_prefix = xroute->src_prefix;
-                last_src_plen = xroute->src_plen;
+                last_prefix = xroute->dt.prefix;
+                last_plen = xroute->dt.plen;
+                last_src_prefix = xroute->dt.src_prefix;
+                last_src_plen = xroute->dt.src_plen;
             } else if(route) {
                 unsigned char channels[MAX_CHANNEL_HOPS];
                 int chlen;
@@ -1694,8 +1694,8 @@ send_self_update(struct interface *ifp)
         while(1) {
             struct xroute *xroute = xroute_stream_next(xroutes);
             if(xroute == NULL) break;
-            send_update(ifp, 0, xroute->prefix, xroute->plen,
-                        xroute->src_prefix, xroute->src_plen);
+            send_update(ifp, 0, xroute->dt.prefix, xroute->dt.plen,
+                        xroute->dt.src_prefix, xroute->dt.src_plen);
         }
         xroute_stream_done(xroutes);
     } else {
