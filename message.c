@@ -1816,8 +1816,7 @@ send_marginal_ihu(struct interface *ifp)
     }
 }
 
-/* Standard wildcard request with prefix == NULL && src_prefix == zeroes,
-   Specific wildcard request with prefix == zeroes && src_prefix == NULL. */
+/* Wildcard requests if prefix == NULL. */
 void
 send_request(struct interface *ifp,
              const unsigned char *prefix, unsigned char plen,
@@ -1841,11 +1840,11 @@ send_request(struct interface *ifp,
     if(!if_up(ifp))
         return;
 
-    if(prefix && src_prefix) {
+    if(prefix) {
         debugf("sending request to %s for %s from %s.\n", ifp->name,
                format_prefix(prefix, plen),
                format_prefix(src_prefix, src_plen));
-    } else if(prefix) {
+    } else {
         debugf("sending request to %s for any specific.\n", ifp->name);
         start_message(ifp, MESSAGE_REQUEST, 5);
         accumulate_byte(ifp, 0);
@@ -1854,17 +1853,11 @@ send_request(struct interface *ifp,
         accumulate_byte(ifp, 1);
         accumulate_byte(ifp, 0);
         end_message(ifp, MESSAGE_REQUEST, 5);
-        return;
-    } else if(src_prefix) {
         debugf("sending request to %s for any.\n", ifp->name);
         start_message(ifp, MESSAGE_REQUEST, 2);
         accumulate_byte(ifp, 0);
         accumulate_byte(ifp, 0);
         end_message(ifp, MESSAGE_REQUEST, 2);
-        return;
-    } else {
-        send_request(ifp, NULL, 0, zeroes, 0);
-        send_request(ifp, zeroes, 0, NULL, 0);
         return;
     }
 
