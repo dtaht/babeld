@@ -206,9 +206,12 @@ conflict_solution(const struct babel_route *rt)
 static int
 is_installed(struct zone *zone)
 {
-    return zone != NULL &&
-        find_installed_route(zone->dst_prefix, zone->dst_plen,
-                             zone->src_prefix, zone->src_plen) != NULL;
+    struct datum dt;
+    memcpy(dt.prefix, zone->dst_prefix, 16);
+    dt.plen = zone->dst_plen;
+    memcpy(dt.src_prefix, zone->src_prefix, 16);
+    dt.src_plen = zone->src_plen;
+    return zone != NULL && find_installed_route(&dt) != NULL;
 }
 
 static int

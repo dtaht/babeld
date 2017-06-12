@@ -466,8 +466,8 @@ interface_up(struct interface *ifp, int up)
         set_timeout(&ifp->update_timeout, ifp->update_interval);
         send_hello(ifp);
         if(rc > 0)
-            send_update(ifp, 0, NULL, 0, NULL, 0);
-        send_request(ifp, NULL, 0, NULL, 0);
+            send_update(ifp, 0, NULL, 0);
+        send_request(ifp, NULL);
     } else {
         flush_interface_routes(ifp, 0);
         ifp->buffered = 0;
@@ -554,8 +554,8 @@ check_interfaces(void)
             check_interface_channel(ifp);
             rc = check_interface_ipv4(ifp);
             if(rc > 0) {
-                send_request(ifp, NULL, 0, NULL, 0);
-                send_update(ifp, 0, NULL, 0, NULL, 0);
+                send_request(ifp, NULL);
+                send_update(ifp, 0, NULL, 0);
             }
         }
     }

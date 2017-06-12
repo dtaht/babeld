@@ -33,11 +33,7 @@ struct source {
     time_t time;
 };
 
-struct source *find_source(const unsigned char *id,
-                           const unsigned char *prefix,
-                           unsigned char plen,
-                           const unsigned char *src_prefix,
-                           unsigned char src_plen,
+struct source *find_source(const unsigned char *id, const struct datum *dt,
                            int create, unsigned short seqno);
 struct source *retain_source(struct source *src);
 void release_source(struct source *src);

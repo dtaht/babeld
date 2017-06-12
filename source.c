@@ -36,9 +36,7 @@ static struct source **sources = NULL;
 static int source_slots = 0, max_source_slots = 0;
 
 static int
-source_compare(const unsigned char *id,
-               const unsigned char *prefix, unsigned char plen,
-               const unsigned char *src_prefix, unsigned char src_plen,
+source_compare(const unsigned char *id, const struct datum *dt,
                const struct source *src)
 {
     int rc;
@@ -47,21 +45,21 @@ source_compare(const unsigned char *id,
     if(rc != 0)
         return rc;
 
-    if(plen < src->dt.plen)
+    if(dt->plen < src->dt.plen)
         return -1;
-    if(plen > src->dt.plen)
+    if(dt->plen > src->dt.plen)
         return 1;
 
-    rc = memcmp(prefix, src->dt.prefix, 16);
+    rc = memcmp(dt->prefix, src->dt.prefix, 16);
     if(rc != 0)
         return rc;
 
-    if(src_plen < src->dt.src_plen)
+    if(dt->src_plen < src->dt.src_plen)
         return -1;
-    if(src_plen > src->dt.src_plen)
+    if(dt->src_plen > src->dt.src_plen)
         return 1;
 
-    rc = memcmp(src_prefix, src->dt.src_prefix, 16);
+    rc = memcmp(dt->src_prefix, src->dt.src_prefix, 16);
     if(rc != 0)
         return rc;
 
@@ -69,9 +67,7 @@ source_compare(const unsigned char *id,
 }
 
 static int
-find_source_slot(const unsigned char *id,
-                 const unsigned char *prefix, unsigned char plen,
-                 const unsigned char *src_prefix, unsigned char src_plen,
+find_source_slot(const unsigned char *id, const struct datum *dt,
                  int *new_return)
 {
     int p, m, g, c;
@@ -86,7 +82,7 @@ find_source_slot(const unsigned char *id,
 
     do {
         m = (p + g) / 2;
-        c = source_compare(id, prefix, plen, src_prefix, src_plen, sources[m]);
+        c = source_compare(id, dt, sources[m]);
         if(c == 0)
             return m;
         else if(c < 0)
@@ -122,13 +118,11 @@ resize_source_table(int new_slots)
 }
 
 struct source*
-find_source(const unsigned char *id,
-            const unsigned char *prefix, unsigned char plen,
-            const unsigned char *src_prefix, unsigned char src_plen,
-            int create, unsigned short seqno)
+find_source(const unsigned char *id, const struct datum *dt, int create,
+            unsigned short seqno)
 {
     int n = -1;
-    int i = find_source_slot(id, prefix, plen, src_prefix, src_plen, &n);
+    int i = find_source_slot(id, dt, &n);
     struct source *src;
 
     if(i >= 0)
@@ -144,10 +138,10 @@ find_source(const unsigned char *id,
     }
 
     memcpy(src->id, id, 8);
-    memcpy(src->dt.prefix, prefix, 16);
-    src->dt.plen = plen;
-    memcpy(src->dt.src_prefix, src_prefix, 16);
-    src->dt.src_plen = src_plen;
+    memcpy(src->dt.prefix, dt->prefix, 16);
+    src->dt.plen = dt->plen;
+    memcpy(src->dt.src_prefix, dt->src_prefix, 16);
+    src->dt.src_plen = dt->src_plen;
     src->seqno = seqno;
     src->metric = INFINITY;
     src->time = now.tv_sec;

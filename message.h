@@ -20,6 +20,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#include "datum.h"
+
 #define MAX_BUFFERED_UPDATES 200
 
 #define BUCKET_TOKENS_MAX 4000
@@ -65,45 +67,25 @@ void send_ack(struct neighbour *neigh, unsigned short nonce,
 void send_hello_noupdate(struct interface *ifp, unsigned interval);
 void send_hello(struct interface *ifp);
 void flush_unicast(int dofree);
-void send_update(struct interface *ifp, int urgent,
-                 const unsigned char *prefix, unsigned char plen,
-                 const unsigned char *src_prefix, unsigned char src_plen);
-void send_update_resend(struct interface *ifp,
-                        const unsigned char *prefix, unsigned char plen,
-                        const unsigned char *src_prefix,
-                        unsigned char src_plen);
+void send_update(struct interface *ifp, int urgent, const struct datum *dt,
+                 int op);
+void send_update_resend(struct interface *ifp, const struct datum *dt);
 void send_wildcard_retraction(struct interface *ifp);
 void update_myseqno(void);
 void send_self_update(struct interface *ifp);
 void send_ihu(struct neighbour *neigh, struct interface *ifp);
 void send_marginal_ihu(struct interface *ifp);
-void send_request(struct interface *ifp,
-                  const unsigned char *prefix, unsigned char plen,
-                  const unsigned char *src_prefix, unsigned char src_plen);
-void send_unicast_request(struct neighbour *neigh,
-                          const unsigned char *prefix, unsigned char plen,
-                          const unsigned char *src_prefix,
-                          unsigned char src_plen);
-void send_multihop_request(struct interface *ifp,
-                           const unsigned char *prefix, unsigned char plen,
-                           const unsigned char *src_prefix,
-                           unsigned char src_plen,
+void send_request(struct interface *ifp, const struct datum *dt);
+void send_unicast_request(struct neighbour *neigh, const struct datum *dt);
+void send_multihop_request(struct interface *ifp, const struct datum *dt,
                            unsigned short seqno, const unsigned char *id,
                            unsigned short hop_count);
 void
-send_unicast_multihop_request(struct neighbour *neigh,
-                              const unsigned char *prefix, unsigned char plen,
-                              const unsigned char *src_prefix,
-                              unsigned char src_plen,
+send_unicast_multihop_request(struct neighbour *neigh, const struct datum *dt,
                               unsigned short seqno, const unsigned char *id,
                               unsigned short hop_count);
-void send_request_resend(struct neighbour *neigh,
-                         const unsigned char *prefix, unsigned char plen,
-                         const unsigned char *src_prefix,
-                         unsigned char src_plen,
+void send_request_resend(struct neighbour *neigh, const struct datum *dt,
                          unsigned short seqno, unsigned char *id);
-void handle_request(struct neighbour *neigh, const unsigned char *prefix,
-                    unsigned char plen,
-                    const unsigned char *src_prefix, unsigned char src_plen,
+void handle_request(struct neighbour *neigh, const struct datum *dt,
                     unsigned char hop_count,
                     unsigned short seqno, const unsigned char *id);

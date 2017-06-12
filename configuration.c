@@ -1237,9 +1237,7 @@ filter_match(struct filter *f, const unsigned char *id,
 }
 
 static int
-do_filter(struct filter *f, const unsigned char *id,
-          const unsigned char *prefix, unsigned short plen,
-          const unsigned char *src_prefix, unsigned short src_plen,
+do_filter(struct filter *f, const unsigned char *id, const struct datum *dt,
           const unsigned char *neigh, unsigned int ifindex, int proto,
           struct filter_result *result)
 {
@@ -1247,8 +1245,8 @@ do_filter(struct filter *f, const unsigned char *id,
         memset(result, 0, sizeof(struct filter_result));
 
     while(f) {
-        if(filter_match(f, id, prefix, plen, src_prefix, src_plen,
-                        neigh, ifindex, proto)) {
+        if(filter_match(f, id, dt->prefix, dt->plen, dt->src_prefix,
+                        dt->src_plen, neigh, ifindex, proto)) {
             if(result)
                 memcpy(result, &f->action, sizeof(struct filter_result));
             return f->action.add_metric;
@@ -1260,55 +1258,44 @@ do_filter(struct filter *f, const unsigned char *id,
 }
 
 int
-input_filter(const unsigned char *id,
-             const unsigned char *prefix, unsigned short plen,
-             const unsigned char *src_prefix, unsigned short src_plen,
+input_filter(const unsigned char *id, const struct datum *dt,
              const unsigned char *neigh, unsigned int ifindex)
 {
     int res;
-    res = do_filter(input_filters, id, prefix, plen,
-                    src_prefix, src_plen, neigh, ifindex, 0, NULL);
+    res = do_filter(input_filters, id, dt, neigh, ifindex, 0, NULL);
     if(res < 0)
         res = 0;
     return res;
 }
 
 int
-output_filter(const unsigned char *id,
-              const unsigned char *prefix, unsigned short plen,
-              const unsigned char *src_prefix, unsigned short src_plen,
+output_filter(const unsigned char *id, const struct datum *dt,
               unsigned int ifindex)
 {
     int res;
-    res = do_filter(output_filters, id, prefix, plen,
-                    src_prefix, src_plen, NULL, ifindex, 0, NULL);
+    res = do_filter(output_filters, id, dt, NULL, ifindex, 0, NULL);
     if(res < 0)
         res = 0;
     return res;
 }
 
 int
-redistribute_filter(const unsigned char *prefix, unsigned short plen,
-                    const unsigned char *src_prefix, unsigned short src_plen,
-                    unsigned int ifindex, int proto,
+redistribute_filter(const struct datum *dt, unsigned int ifindex, int proto,
                     struct filter_result *result)
 {
     int res;
-    res = do_filter(redistribute_filters, NULL, prefix, plen,
-                    src_prefix, src_plen, NULL, ifindex, proto, result);
+    res = do_filter(redistribute_filters, NULL, dt, NULL, ifindex, proto,
+                    result);
     if(res < 0)
         res = INFINITY;
     return res;
 }
 
 int
-install_filter(const unsigned char *prefix, unsigned short plen,
-               const unsigned char *src_prefix, unsigned short src_plen,
-               struct filter_result *result)
+install_filter(const struct datum *dt, struct filter_result *result)
 {
     int res;
-    res = do_filter(install_filters, NULL, prefix, plen,
-                    src_prefix, src_plen, NULL, 0, 0, result);
+    res = do_filter(install_filters, NULL, dt, NULL, 0, 0, result);
     if(res < 0)
         res = INFINITY;
     return res;

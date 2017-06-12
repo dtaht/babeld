@@ -42,25 +42,17 @@ struct resend {
 
 extern struct timeval resend_time;
 
-struct resend *find_request(const unsigned char *prefix, unsigned char plen,
-                    const unsigned char *src_prefix, unsigned char src_plen,
-                    struct resend **previous_return);
+struct resend *find_request(const struct datum *dt,
+                            struct resend **previous_return);
 void flush_resends(struct neighbour *neigh);
-int record_resend(int kind, const unsigned char *prefix, unsigned char plen,
-                  const unsigned char *src_prefix, unsigned char src_plen,
-                  unsigned short seqno, const unsigned char *id,
-                  struct interface *ifp, int delay);
-int unsatisfied_request(const unsigned char *prefix, unsigned char plen,
-                        const unsigned char *src_prefix, unsigned char src_plen,
-                        unsigned short seqno, const unsigned char *id);
-int request_redundant(struct interface *ifp,
-                      const unsigned char *prefix, unsigned char plen,
-                      const unsigned char *src_prefix, unsigned char src_plen,
+int record_resend(int kind, const struct datum *dt, unsigned short seqno,
+                  const unsigned char *id, struct interface *ifp, int delay);
+int unsatisfied_request(const struct datum *dt, unsigned short seqno,
+                        const unsigned char *id);
+int request_redundant(struct interface *ifp, const struct datum *dt,
                       unsigned short seqno, const unsigned char *id);
-int satisfy_request(const unsigned char *prefix, unsigned char plen,
-                    const unsigned char *src_prefix, unsigned char src_plen,
-                    unsigned short seqno, const unsigned char *id,
-                    struct interface *ifp);
+int satisfy_request(const struct datum *dt, unsigned short seqno,
+                    const unsigned char *id, struct interface *ifp);
 
 void expire_resend(void);
 void recompute_resend_time(void);

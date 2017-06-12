@@ -37,15 +37,10 @@ struct timeval resend_time = {0, 0};
 struct resend *to_resend = NULL;
 
 static int
-resend_match(struct resend *resend,
-             int kind, const unsigned char *prefix, unsigned char plen,
-             const unsigned char *src_prefix, unsigned char src_plen)
+resend_match(struct resend *resend, int kind, const struct datum *dt)
 {
     return (resend->kind == kind &&
-            resend->dt.plen == plen &&
-            memcmp(resend->dt.prefix, prefix, 16) == 0 &&
-            resend->dt.src_plen == src_plen &&
-            memcmp(resend->dt.src_prefix, src_prefix, 16) == 0);
+            memcmp(&resend->dt, dt, sizeof(struct datum)));
 }
 
 /* This is called by neigh.c when a neighbour is flushed */
@@ -57,16 +52,14 @@ flush_resends(struct neighbour *neigh)
 }
 
 static struct resend *
-find_resend(int kind, const unsigned char *prefix, unsigned char plen,
-            const unsigned char *src_prefix, unsigned char src_plen,
-            struct resend **previous_return)
+find_resend(int kind, const struct datum *dt, struct resend **previous_return)
 {
     struct resend *current, *previous;
 
     previous = NULL;
     current = to_resend;
     while(current) {
-        if(resend_match(current, kind, prefix, plen, src_prefix, src_plen)) {
+        if(resend_match(current, kind, dt)) {
             if(previous_return)
                 *previous_return = previous;
             return current;
@@ -79,36 +72,27 @@ find_resend(int kind, const unsigned char *prefix, unsigned char plen,
 }
 
 struct resend *
-find_request(const unsigned char *prefix, unsigned char plen,
-             const unsigned char *src_prefix, unsigned char src_plen,
-             struct resend **previous_return)
+find_request(const struct datum *dt, struct resend **previous_return)
 {
-    return find_resend(RESEND_REQUEST, prefix, plen, src_prefix, src_plen,
-                       previous_return);
+    return find_resend(RESEND_REQUEST, dt, previous_return);
 }
 
 int
-record_resend(int kind, const unsigned char *prefix, unsigned char plen,
-              const unsigned char *src_prefix, unsigned char src_plen,
-              unsigned short seqno, const unsigned char *id,
-              struct interface *ifp, int delay)
+record_resend(int kind, const struct datum *dt, unsigned short seqno,
+              const unsigned char *id, struct interface *ifp, int delay)
 {
     struct resend *resend;
     unsigned int ifindex = ifp ? ifp->ifindex : 0;
 
     if((kind == RESEND_REQUEST &&
-        input_filter(NULL, prefix, plen, src_prefix, src_plen, NULL,
-                     ifindex) >=
-        INFINITY) ||
-       (kind == RESEND_UPDATE &&
-        output_filter(NULL, prefix, plen, src_prefix, src_plen, ifindex) >=
-        INFINITY))
+        input_filter(NULL, dt, NULL, ifindex) >= INFINITY) ||
+       (kind == RESEND_UPDATE && output_filter(NULL, dt, ifindex) >= INFINITY))
         return 0;
 
     if(delay >= 0xFFFF)
         delay = 0xFFFF;
 
-    resend = find_resend(kind, prefix, plen, src_prefix, src_plen, NULL);
+    resend = find_resend(kind, dt, NULL);
     if(resend) {
         if(resend->delay && delay)
             resend->delay = MIN(resend->delay, delay);
@@ -134,10 +118,7 @@ record_resend(int kind, const unsigned char *prefix, unsigned char plen,
         resend->kind = kind;
         resend->max = RESEND_MAX;
         resend->delay = delay;
-        memcpy(resend->dt.prefix, prefix, 16);
-        resend->dt.plen = plen;
-        memcpy(resend->dt.src_prefix, src_prefix, 16);
-        resend->dt.src_plen = src_plen;
+        memcpy(&resend->dt, dt, sizeof(struct datum));
         resend->seqno = seqno;
         if(id)
             memcpy(resend->id, id, 8);
@@ -167,13 +148,12 @@ resend_expired(struct resend *resend)
 }
 
 int
-unsatisfied_request(const unsigned char *prefix, unsigned char plen,
-                    const unsigned char *src_prefix, unsigned char src_plen,
-                    unsigned short seqno, const unsigned char *id)
+unsatisfied_request(const struct datum *dt, unsigned short seqno,
+                    const unsigned char *id)
 {
     struct resend *request;
 
-    request = find_request(prefix, plen, src_prefix, src_plen, NULL);
+    request = find_request(dt, NULL);
     if(request == NULL || resend_expired(request))
         return 0;
 
@@ -186,14 +166,12 @@ unsatisfied_request(const unsigned char *prefix, unsigned char plen,
 
 /* Determine whether a given request should be forwarded. */
 int
-request_redundant(struct interface *ifp,
-                  const unsigned char *prefix, unsigned char plen,
-                  const unsigned char *src_prefix, unsigned char src_plen,
+request_redundant(struct interface *ifp, const struct datum *dt,
                   unsigned short seqno, const unsigned char *id)
 {
     struct resend *request;
 
-    request = find_request(prefix, plen, src_prefix, src_plen, NULL);
+    request = find_request(dt, NULL);
     if(request == NULL || resend_expired(request))
         return 0;
 
@@ -217,14 +195,12 @@ request_redundant(struct interface *ifp,
 }
 
 int
-satisfy_request(const unsigned char *prefix, unsigned char plen,
-                const unsigned char *src_prefix, unsigned char src_plen,
-                unsigned short seqno, const unsigned char *id,
-                struct interface *ifp)
+satisfy_request(const struct datum *dt, unsigned short seqno,
+                const unsigned char *id, struct interface *ifp)
 {
     struct resend *request, *previous;
 
-    request = find_request(prefix, plen, src_prefix, src_plen, &previous);
+    request = find_request(dt, &previous);
     if(request == NULL)
         return 0;
 
@@ -305,16 +281,11 @@ do_resend()
             if(timeval_compare(&now, &timeout) >= 0) {
                 switch(resend->kind) {
                 case RESEND_REQUEST:
-                    send_multihop_request(resend->ifp,
-                                          resend->dt.prefix, resend->dt.plen,
-                                          resend->dt.src_prefix,
-                                          resend->dt.src_plen,
+                    send_multihop_request(resend->ifp, &resend->dt,
                                           resend->seqno, resend->id, 127);
                     break;
                 case RESEND_UPDATE:
-                    send_update(resend->ifp, 1,
-                                resend->dt.prefix, resend->dt.plen,
-                                resend->dt.src_prefix, resend->dt.src_plen);
+                    send_update(resend->ifp, 1, &resend->dt, 0);
                     break;
                 default: abort();
                 }

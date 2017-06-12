@@ -181,8 +181,13 @@ find_table(const unsigned char *dest, unsigned short plen,
     struct filter_result filter_result = {0};
     struct rule *kr = NULL;
     int i, found;
+    struct datum dt;
+    memcpy(dt.prefix, dest, 16);
+    dt.plen = plen;
+    memcpy(dt.src_prefix, src, 16);
+    dt.src_plen = src_plen;
 
-    install_filter(dest, plen, src, src_plen, &filter_result);
+    install_filter(&dt, &filter_result);
     if(filter_result.table) {
         return filter_result.table;
     } else if(is_default(src, src_plen)) {
