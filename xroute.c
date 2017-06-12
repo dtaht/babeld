@@ -310,7 +310,10 @@ check_xroutes(int send_updates)
         if(metric < INFINITY && metric == xroutes[i].metric) {
             for(j = 0; j < numroutes; j++) {
                 if(xroutes[i].plen == routes[j].plen &&
+                   xroutes[i].src_plen == routes[j].src_plen &&
                    memcmp(xroutes[i].prefix, routes[j].prefix, 16) == 0 &&
+                   memcmp(xroutes[i].src_prefix,
+                          routes[j].src_prefix, 16) == 0 &&
                    xroutes[i].ifindex == routes[j].ifindex &&
                    xroutes[i].proto == routes[j].proto) {
                     export = 1;
