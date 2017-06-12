@@ -42,9 +42,10 @@ resend_match(struct resend *resend,
              const unsigned char *src_prefix, unsigned char src_plen)
 {
     return (resend->kind == kind &&
-            resend->plen == plen && memcmp(resend->prefix, prefix, 16) == 0 &&
-            resend->src_plen == src_plen &&
-            memcmp(resend->src_prefix, src_prefix, 16) == 0);
+            resend->dt.plen == plen &&
+            memcmp(resend->dt.prefix, prefix, 16) == 0 &&
+            resend->dt.src_plen == src_plen &&
+            memcmp(resend->dt.src_prefix, src_prefix, 16) == 0);
 }
 
 /* This is called by neigh.c when a neighbour is flushed */
@@ -133,10 +134,10 @@ record_resend(int kind, const unsigned char *prefix, unsigned char plen,
         resend->kind = kind;
         resend->max = RESEND_MAX;
         resend->delay = delay;
-        memcpy(resend->prefix, prefix, 16);
-        resend->plen = plen;
-        memcpy(resend->src_prefix, src_prefix, 16);
-        resend->src_plen = src_plen;
+        memcpy(resend->dt.prefix, prefix, 16);
+        resend->dt.plen = plen;
+        memcpy(resend->dt.src_prefix, src_prefix, 16);
+        resend->dt.src_plen = src_plen;
         resend->seqno = seqno;
         if(id)
             memcpy(resend->id, id, 8);
@@ -305,14 +306,15 @@ do_resend()
                 switch(resend->kind) {
                 case RESEND_REQUEST:
                     send_multihop_request(resend->ifp,
-                                          resend->prefix, resend->plen,
-                                          resend->src_prefix, resend->src_plen,
+                                          resend->dt.prefix, resend->dt.plen,
+                                          resend->dt.src_prefix,
+                                          resend->dt.src_plen,
                                           resend->seqno, resend->id, 127);
                     break;
                 case RESEND_UPDATE:
                     send_update(resend->ifp, 1,
-                                resend->prefix, resend->plen,
-                                resend->src_prefix, resend->src_plen);
+                                resend->dt.prefix, resend->dt.plen,
+                                resend->dt.src_prefix, resend->dt.src_plen);
                     break;
                 default: abort();
                 }

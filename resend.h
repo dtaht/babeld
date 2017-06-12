@@ -20,6 +20,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#include "datum.h"
+
 #define REQUEST_TIMEOUT 65000
 #define RESEND_MAX 3
 
@@ -31,10 +33,7 @@ struct resend {
     unsigned char max;
     unsigned short delay;
     struct timeval time;
-    unsigned char prefix[16];
-    unsigned char plen;
-    unsigned char src_prefix[16];
-    unsigned char src_plen;
+    struct datum dt;
     unsigned short seqno;
     unsigned char id[8];
     struct interface *ifp;
