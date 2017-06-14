@@ -86,7 +86,7 @@ flush_xroute(struct xroute *xroute)
     }
 }
 
-int
+static int
 add_xroute(struct datum dt, unsigned short metric, unsigned int ifindex,
            int proto)
 {

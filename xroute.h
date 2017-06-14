@@ -33,8 +33,6 @@ struct xroute_stream;
 
 struct xroute *find_xroute(const struct datum *dt);
 void flush_xroute(struct xroute *xroute);
-int add_xroute(struct datum dt, unsigned short metric, unsigned int ifindex,
-               int proto);
 int xroutes_estimate(void);
 struct xroute_stream *xroute_stream();
 struct xroute *xroute_stream_next(struct xroute_stream *stream);
