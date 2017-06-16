@@ -472,6 +472,8 @@ parse_filter(int c, gnc_t gnc, void *closure, struct filter **filter_return)
     } else if(filter->af == AF_INET) {
         filter->plen_le += 96;
         filter->plen_ge += 96;
+        filter->src_plen_le += 96;
+        filter->src_plen_ge += 96;
     }
     *filter_return = filter;
     return c;
