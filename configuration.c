@@ -451,8 +451,6 @@ parse_filter(int c, gnc_t gnc, void *closure, struct filter **filter_return)
                 filter->af = af;
             else if(filter->af != af)
                 goto error;
-            if(af == AF_INET && filter->action.src_plen == 96)
-                memset(&filter->action.src_prefix, 0, 16);
         } else if(strcmp(token, "table") == 0) {
             int table;
             c = getint(c, &table, gnc, closure);
