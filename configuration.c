@@ -320,6 +320,23 @@ get_interface_type(int c, int *type_r, gnc_t gnc, void *closure)
     return c;
 }
 
+static void
+free_filter(struct filter *f)
+{
+    if(f->ifname)
+        free(f->ifname);
+    if(f->id)
+        free(f->id);
+    if(f->prefix)
+        free(f->prefix);
+    if(f->src_prefix)
+        free(f->src_prefix);
+    if(f->neigh)
+        free(f->neigh);
+    if(f->action.src_prefix)
+        free(f->action.src_prefix);
+    free(f);
+}
 
 static int
 parse_filter(int c, gnc_t gnc, void *closure, struct filter **filter_return)
@@ -341,7 +358,7 @@ parse_filter(int c, gnc_t gnc, void *closure, struct filter **filter_return)
         }
         c = getword(c, &token, gnc, closure);
         if(c < -1) {
-            free(filter);
+            free_filter(filter);
             return -2;
         }
 
@@ -478,7 +495,7 @@ parse_filter(int c, gnc_t gnc, void *closure, struct filter **filter_return)
 
  error:
     free(token);
-    free(filter);
+    free_filter(filter);
     return -2;
 }
 
@@ -619,6 +636,8 @@ parse_anonymous_ifconf(int c, gnc_t gnc, void *closure,
     return c;
 
  error:
+    if(if_conf->ifname)
+        free(if_conf->ifname);
     free(if_conf);
     return -2;
 }
@@ -711,6 +730,7 @@ add_ifconf(struct interface_conf *if_conf, struct interface_conf **if_confs)
         while(next) {
             if(strcmp(next->ifname, if_conf->ifname) == 0) {
                 merge_ifconf(next, if_conf, next);
+                free(if_conf->ifname);
                 free(if_conf);
                 if_conf = next;
                 goto done;
@@ -732,6 +752,7 @@ flush_ifconf(struct interface_conf *if_conf)
 {
     if(if_conf == interface_confs) {
         interface_confs = if_conf->next;
+        free(if_conf->ifname);
         free(if_conf);
         return;
     } else {
@@ -739,6 +760,7 @@ flush_ifconf(struct interface_conf *if_conf)
         while(prev) {
             if(prev->next == if_conf) {
                 prev->next = if_conf->next;
+                free(if_conf->ifname);
                 free(if_conf);
                 return;
             }
