@@ -335,7 +335,12 @@ kinstall_route(const struct babel_route *route)
  end:
     if(rc < 0) {
         int save = errno;
-        perror("kernel_route(ADD)");
+        fprintf(stderr, "kernel_route(ADD %s from %s dev %u metric %u): %s\n",
+                format_prefix(route->src->dt.prefix, route->src->dt.plen),
+                format_prefix(route->src->dt.src_prefix,
+                              route->src->dt.src_plen),
+                route->neigh->ifp->ifindex,
+                metric_to_kernel(route_metric(route)), strerror(errno));
         if(save != EEXIST)
             return -1;
     }
@@ -361,7 +366,13 @@ kuninstall_route(const struct babel_route *route)
         /* no disambiguation */
         rc = del_route(&zone, route);
         if(rc < 0)
-            perror("kernel_route(FLUSH)");
+            fprintf(stderr,
+                    "kernel_route(FLUSH %s from %s dev %u metric %u): %s\n",
+                    format_prefix(route->src->dt.prefix, route->src->dt.plen),
+                    format_prefix(route->src->dt.src_prefix,
+                                  route->src->dt.src_plen),
+                    route->neigh->ifp->ifindex,
+                    metric_to_kernel(route_metric(route)), strerror(errno));
         return rc;
     }
     /* Remove the route, or change if the route was solving a conflict. */
@@ -371,7 +382,12 @@ kuninstall_route(const struct babel_route *route)
     else
         rc = chg_route(&zone, route, rt1);
     if(rc < 0)
-        perror("kernel_route(FLUSH)");
+        fprintf(stderr, "kernel_route(FLUSH %s from %s dev %u metric %u): %s\n",
+                format_prefix(route->src->dt.prefix, route->src->dt.plen),
+                format_prefix(route->src->dt.src_prefix,
+                              route->src->dt.src_plen),
+                route->neigh->ifp->ifindex,
+                metric_to_kernel(route_metric(route)), strerror(errno));
 
     /* Remove completion routes */
     stream = route_stream(ROUTE_INSTALLED);
@@ -413,7 +429,17 @@ kswitch_routes(const struct babel_route *old, const struct babel_route *new)
     to_zone(old, &zone);
     rc = chg_route(&zone, old, new);
     if(rc < 0) {
-        perror("kernel_route(MODIFY)");
+        fprintf(stderr, "kernel_route(MODIFY %s from %s dev %u metric %u "
+                "TO %s from %s dev %u metric %u): %s\n",
+                format_prefix(old->src->dt.prefix, old->src->dt.plen),
+                format_prefix(old->src->dt.src_prefix,
+                              old->src->dt.src_plen),
+                old->neigh->ifp->ifindex, metric_to_kernel(route_metric(old)),
+                format_prefix(new->src->dt.prefix, new->src->dt.plen),
+                format_prefix(new->src->dt.src_prefix,
+                              new->src->dt.src_plen),
+                new->neigh->ifp->ifindex,
+                metric_to_kernel(route_metric(new)), strerror(errno));
         return -1;
     }
 
@@ -462,7 +488,13 @@ kchange_route_metric(const struct babel_route *route,
     to_zone(route, &zone);
     rc = chg_route_metric(&zone, route, old_metric, new_metric);
     if(rc < 0) {
-        perror("kernel_route(MODIFY metric)");
+        fprintf(stderr, "kernel_route(MODIFY %s from %s dev %u metric "
+                "[%u TO %u]): %s\n",
+                format_prefix(route->src->dt.prefix, route->src->dt.plen),
+                format_prefix(route->src->dt.src_prefix,
+                              route->src->dt.src_plen),
+                route->neigh->ifp->ifindex, old_metric, new_metric,
+                strerror(errno));
         return -1;
     }
 
