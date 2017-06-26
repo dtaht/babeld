@@ -682,7 +682,12 @@ parse_kernel_route(const struct rt_msghdr *rtm, struct kernel_route *route)
             route->dt.plen = mask2len((unsigned char*)&sin->sin_addr, 4);
         }
     }
-    if(v4mapped(route->dt.prefix)) route->dt.plen += 96;
+    if(v4mapped(route->dt.prefix)) {
+        const unsigned char zeroes[4] = {0, 0, 0, 0};
+        route->dt.plen += 96;
+        v4tov6(route->dt.src_prefix, zeroes);
+        route->dt.src_plen = 96;
+    }
     if(rtm->rtm_flags & RTF_HOST) route->dt.plen = 128;
 
     return 0;
