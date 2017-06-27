@@ -315,8 +315,7 @@ parse_address(const char *address, unsigned char *addr_r, int *af_r)
 
     rc = inet_pton(AF_INET, address, &ina);
     if(rc > 0) {
-        memcpy(addr_r, v4prefix, 12);
-        memcpy(addr_r + 12, &ina, 4);
+        v4tov6(addr_r, (const unsigned char *)&ina);
         if(af_r) *af_r = AF_INET;
         return 0;
     }
