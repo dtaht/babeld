@@ -215,7 +215,7 @@ is_installed(struct zone *zone)
 }
 
 static int
-add_route(const struct zone *zone, const struct babel_route *route)
+kernel_route_add(const struct zone *zone, const struct babel_route *route)
 {
     int table = find_table(zone->dst_prefix, zone->dst_plen,
                            zone->src_prefix, zone->src_plen);
@@ -227,7 +227,7 @@ add_route(const struct zone *zone, const struct babel_route *route)
 }
 
 static int
-del_route(const struct zone *zone, const struct babel_route *route)
+kernel_route_flush(const struct zone *zone, const struct babel_route *route)
 {
     int table = find_table(zone->dst_prefix, zone->dst_plen,
                            zone->src_prefix, zone->src_plen);
@@ -239,8 +239,8 @@ del_route(const struct zone *zone, const struct babel_route *route)
 }
 
 static int
-chg_route(const struct zone *zone, const struct babel_route *old,
-          const struct babel_route *new)
+kernel_route_modify(const struct zone *zone, const struct babel_route *old,
+                    const struct babel_route *new)
 {
     int table = find_table(zone->dst_prefix, zone->dst_plen,
                            zone->src_prefix, zone->src_plen);
@@ -253,8 +253,9 @@ chg_route(const struct zone *zone, const struct babel_route *old,
 }
 
 static int
-chg_route_metric(const struct zone *zone, const struct babel_route *route,
-                 int old_metric, int new_metric)
+kernel_route_modify_metric(const struct zone *zone,
+                           const struct babel_route *route,
+                           int old_metric, int new_metric)
 {
     int table = find_table(zone->dst_prefix, zone->dst_plen,
                            zone->src_prefix, zone->src_plen);
@@ -281,7 +282,7 @@ not_any_specific_route(void) {
 }
 
 int
-kinstall_route(const struct babel_route *route)
+disambiguate_install(const struct babel_route *route)
 {
     int rc;
     struct zone zone;
@@ -298,7 +299,7 @@ kinstall_route(const struct babel_route *route)
         not_any_specific_route())) {
         /* no disambiguation */
         to_zone(route, &zone);
-        rc = add_route(&zone, route);
+        rc = kernel_route_add(&zone, route);
         goto end;
     }
 
@@ -319,9 +320,9 @@ kinstall_route(const struct babel_route *route)
             continue;
         rt2 = min_conflict(&zone, rt1);
         if(rt2 == NULL)
-            add_route(&zone, min_route(route, rt1));
+            kernel_route_add(&zone, min_route(route, rt1));
         else if(rt_cmp(route, rt2) < 0 && rt_cmp(route, rt1) < 0)
-            chg_route(&zone, rt2, route);
+            kernel_route_modify(&zone, rt2, route);
     }
     route_stream_done(stream);
 
@@ -329,9 +330,9 @@ kinstall_route(const struct babel_route *route)
     to_zone(route, &zone);
     rt1 = conflict_solution(route);
     if(rt1 == NULL)
-        rc = add_route(&zone, route);
+        rc = kernel_route_add(&zone, route);
     else
-        rc = chg_route(&zone, rt1, route);
+        rc = kernel_route_modify(&zone, rt1, route);
  end:
     if(rc < 0) {
         int save = errno;
@@ -348,7 +349,7 @@ kinstall_route(const struct babel_route *route)
 }
 
 int
-kuninstall_route(const struct babel_route *route)
+disambiguate_uninstall(const struct babel_route *route)
 {
     int rc;
     struct zone zone;
@@ -364,7 +365,7 @@ kuninstall_route(const struct babel_route *route)
        (is_default(route->src->dt.src_prefix, route->src->dt.src_plen) &&
         not_any_specific_route())) {
         /* no disambiguation */
-        rc = del_route(&zone, route);
+        rc = kernel_route_flush(&zone, route);
         if(rc < 0)
             fprintf(stderr,
                     "kernel_route(FLUSH %s from %s dev %u metric %u): %s\n",
@@ -378,9 +379,9 @@ kuninstall_route(const struct babel_route *route)
     /* Remove the route, or change if the route was solving a conflict. */
     rt1 = conflict_solution(route);
     if(rt1 == NULL)
-        rc = del_route(&zone, route);
+        rc = kernel_route_flush(&zone, route);
     else
-        rc = chg_route(&zone, route, rt1);
+        rc = kernel_route_modify(&zone, route, rt1);
     if(rc < 0)
         fprintf(stderr, "kernel_route(FLUSH %s from %s dev %u metric %u): %s\n",
                 format_prefix(route->src->dt.prefix, route->src->dt.plen),
@@ -406,9 +407,9 @@ kuninstall_route(const struct babel_route *route)
             continue;
         rt2 = min_conflict(&zone, rt1);
         if(rt2 == NULL)
-            del_route(&zone, min_route(route, rt1));
+            kernel_route_flush(&zone, min_route(route, rt1));
         else if(rt_cmp(route, rt2) < 0 && rt_cmp(route, rt1) < 0)
-            chg_route(&zone, route, rt2);
+            kernel_route_modify(&zone, route, rt2);
     }
     route_stream_done(stream);
 
@@ -416,7 +417,7 @@ kuninstall_route(const struct babel_route *route)
 }
 
 int
-kswitch_routes(const struct babel_route *old, const struct babel_route *new)
+disambiguate_switch(const struct babel_route *old, const struct babel_route *new)
 {
     int rc;
     struct zone zone;
@@ -427,7 +428,7 @@ kswitch_routes(const struct babel_route *old, const struct babel_route *new)
            format_prefix(old->src->dt.prefix, old->src->dt.plen),
            format_prefix(old->src->dt.src_prefix, old->src->dt.src_plen));
     to_zone(old, &zone);
-    rc = chg_route(&zone, old, new);
+    rc = kernel_route_modify(&zone, old, new);
     if(rc < 0) {
         fprintf(stderr, "kernel_route(MODIFY %s from %s dev %u metric %u "
                 "TO %s from %s dev %u metric %u): %s\n",
@@ -462,7 +463,7 @@ kswitch_routes(const struct babel_route *old, const struct babel_route *new)
                  rt_cmp(old, rt1) < 0 &&
                  rt_cmp(old, min_conflict(&zone, rt1)) == 0))
                 continue;
-            chg_route(&zone, old, new);
+            kernel_route_modify(&zone, old, new);
         }
         route_stream_done(stream);
     }
@@ -471,11 +472,9 @@ kswitch_routes(const struct babel_route *old, const struct babel_route *new)
 }
 
 int
-kchange_route_metric(const struct babel_route *route,
-                     unsigned refmetric, unsigned cost, unsigned add)
+disambiguate_change_metric(const struct babel_route *route, int old_metric,
+                           int new_metric)
 {
-    int old_metric = metric_to_kernel(route_metric(route));
-    int new_metric = metric_to_kernel(MIN(refmetric + cost + add, INFINITY));
     int rc;
     struct babel_route *rt1 = NULL;
     struct route_stream *stream = NULL;
@@ -486,7 +485,7 @@ kchange_route_metric(const struct babel_route *route,
            format_prefix(route->src->dt.src_prefix, route->src->dt.src_plen),
            old_metric, new_metric);
     to_zone(route, &zone);
-    rc = chg_route_metric(&zone, route, old_metric, new_metric);
+    rc = kernel_route_modify_metric(&zone, route, old_metric, new_metric);
     if(rc < 0) {
         fprintf(stderr, "kernel_route(MODIFY %s from %s dev %u metric "
                 "[%u TO %u]): %s\n",
@@ -498,7 +497,7 @@ kchange_route_metric(const struct babel_route *route,
         return -1;
     }
 
-    /* change completion routes */
+    /* change completion routes metric */
     if(!kernel_disambiguate(v4mapped(route->nexthop)) &&
        !not_any_specific_route()) {
         stream = route_stream(ROUTE_INSTALLED);
@@ -506,7 +505,6 @@ kchange_route_metric(const struct babel_route *route,
             fprintf(stderr, "Couldn't allocate route stream.\n");
             return -1;
         }
-
         while(1) {
             rt1 = route_stream_next(stream);
             if(rt1 == NULL) break;
@@ -518,7 +516,7 @@ kchange_route_metric(const struct babel_route *route,
                  rt_cmp(route, rt1) < 0 &&
                  rt_cmp(route, min_conflict(&zone, rt1)) == 0))
                 continue;
-            chg_route_metric(&zone, route, old_metric, new_metric);
+            kernel_route_modify_metric(&zone, route, old_metric, new_metric);
         }
         route_stream_done(stream);
     }

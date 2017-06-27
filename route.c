@@ -478,7 +478,7 @@ install_route(struct babel_route *route)
         return;
     }
 
-    rc = kinstall_route(route);
+    rc = disambiguate_install(route);
     if(rc < 0 && errno != EEXIST)
         return;
 
@@ -496,7 +496,7 @@ uninstall_route(struct babel_route *route)
 
     route->installed = 0;
 
-    kuninstall_route(route);
+    disambiguate_uninstall(route);
 
     local_notify_route(route, LOCAL_CHANGE);
 }
@@ -522,7 +522,7 @@ switch_routes(struct babel_route *old, struct babel_route *new)
         fprintf(stderr, "WARNING: switching to unfeasible route "
                 "(this shouldn't happen).");
 
-    rc = kswitch_routes(old, new);
+    rc = disambiguate_switch(old, new);
     if(rc < 0)
         return;
 
@@ -545,7 +545,7 @@ change_route_metric(struct babel_route *route,
 
     if(route->installed && old != new) {
         int rc;
-        rc = kchange_route_metric(route, refmetric, cost, add);
+        rc = disambiguate_change_metric(route, old, new);
         if(rc < 0)
             return;
     }

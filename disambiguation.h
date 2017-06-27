@@ -20,8 +20,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-int kinstall_route(const struct babel_route *route);
-int kuninstall_route(const struct babel_route *route);
-int kswitch_routes(const struct babel_route *old, const struct babel_route *new);
-int kchange_route_metric(const struct babel_route *route,
-                         unsigned refmetric, unsigned cost, unsigned add);
+int disambiguate_install(const struct babel_route *route);
+int disambiguate_uninstall(const struct babel_route *route);
+int disambiguate_switch(const struct babel_route *old,
+                        const struct babel_route *new);
+int disambiguate_change_metric(const struct babel_route *route, int old_metric,
+                               int new_metric);
