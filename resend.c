@@ -40,7 +40,7 @@ static int
 resend_match(struct resend *resend, int kind, const struct datum *dt)
 {
     return (resend->kind == kind &&
-            memcmp(&resend->dt, dt, sizeof(struct datum)));
+            memcmp(&resend->dt, dt, sizeof(struct datum)) == 0);
 }
 
 /* This is called by neigh.c when a neighbour is flushed */
