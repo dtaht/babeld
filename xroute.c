@@ -47,10 +47,7 @@ find_xroute(const struct datum *dt)
 {
     int i;
     for(i = 0; i < numxroutes; i++) {
-        if(xroutes[i].dt.plen == dt->plen &&
-           memcmp(xroutes[i].dt.prefix, dt->prefix, 16) == 0 &&
-           xroutes[i].dt.src_plen == dt->src_plen &&
-           memcmp(xroutes[i].dt.src_prefix, dt->src_prefix, 16) == 0)
+        if(memcmp(&xroutes[i].dt, dt, sizeof(struct datum)) == 0)
             return &xroutes[i];
     }
     return NULL;
