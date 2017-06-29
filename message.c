@@ -692,8 +692,8 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                 if(rc < 0)
                     goto done;
                 debugf("Received wildcard update%s%s from %s on %s.\n",
-                       (message[3] & 0x80) ? "/prefix" : "",
-                       (message[3] & 0x40) ? "/id" : "",
+                       (flags & 0x80) ? "/prefix" : "",
+                       (flags & 0x40) ? "/id" : "",
                        format_address(from), ifp->name);
                 if(metric < 0xFFFF) {
                     fprintf(stderr,
@@ -712,8 +712,7 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                 nh = neigh->address;
             }
 
-            rc = parse_update_subtlv(ifp, metric, message[2],
-                                     message + 2 + parsed_len,
+            rc = parse_update_subtlv(ifp, metric, ae, message + 2 + parsed_len,
                                      len - parsed_len, channels, &channels_len,
                                      dt.src_prefix, &dt.src_plen);
             if(rc < 0)
@@ -721,8 +720,8 @@ parse_packet(const unsigned char *from, struct interface *ifp,
             is_ss = !is_default(dt.src_prefix, dt.src_plen);
 
             debugf("Received update%s%s for dst %s%s%s from %s on %s.\n",
-                   (message[3] & 0x80) ? "/prefix" : "",
-                   (message[3] & 0x40) ? "/id" : "",
+                   (flags & 0x80) ? "/prefix" : "",
+                   (flags & 0x40) ? "/id" : "",
                    format_prefix(dt.prefix, dt.plen),
                    is_ss ? " src " : "",
                    is_ss ? format_prefix(dt.src_prefix, dt.src_plen) : "",
