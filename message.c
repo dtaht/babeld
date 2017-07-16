@@ -1268,7 +1268,7 @@ really_send_update(struct interface *ifp,
                   ifp->buffered_prefix[omit] == dt->prefix[omit])
                 omit++;
         }
-        if(!is_ss && (!ifp->have_buffered_prefix || dt->plen >= 48))
+        if(!ifp->have_buffered_prefix || dt->plen >= 48)
             flags |= 0x80;
         real_prefix = dt->prefix;
         real_plen = dt->plen;
@@ -1277,8 +1277,7 @@ really_send_update(struct interface *ifp,
     }
 
     if(!ifp->have_buffered_id || memcmp(id, ifp->buffered_id, 8) != 0) {
-        if(!is_ss && real_plen == 128 &&
-           memcmp(real_prefix + 8, id, 8) == 0) {
+        if(real_plen == 128 && memcmp(real_prefix + 8, id, 8) == 0) {
             flags |= 0x40;
         } else {
             start_message(ifp, MESSAGE_ROUTER_ID, 10);
