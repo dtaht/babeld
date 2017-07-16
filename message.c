@@ -1370,10 +1370,7 @@ flushupdates(struct interface *ifp)
 {
     struct xroute *xroute;
     struct babel_route *route;
-    const unsigned char *last_prefix = NULL;
-    const unsigned char *last_src_prefix = NULL;
-    unsigned char last_plen = 0xFF;
-    unsigned char last_src_plen = 0xFF;
+    struct datum *last = NULL;
     int i;
 
     if(ifp == NULL) {
@@ -1415,11 +1412,7 @@ flushupdates(struct interface *ifp)
                sent out.  Since our buffer is now sorted, it is enough to
                compare with the previous update. */
 
-            if(last_prefix &&
-               b[i].dt.plen == last_plen &&
-               b[i].dt.src_plen == last_src_plen &&
-               memcmp(b[i].dt.prefix, last_prefix, 16) == 0 &&
-               memcmp(b[i].dt.src_prefix, last_src_prefix, 16) == 0)
+            if(last && memcmp(last, &b[i].dt, sizeof(struct datum)) == 0)
                 continue;
 
             xroute = find_xroute(&b[i].dt);
@@ -1428,10 +1421,7 @@ flushupdates(struct interface *ifp)
             if(xroute && (!route || xroute->metric <= kernel_metric)) {
                 really_send_update(ifp, myid, &xroute->dt, myseqno,
                                    xroute->metric, NULL, 0);
-                last_prefix = xroute->dt.prefix;
-                last_plen = xroute->dt.plen;
-                last_src_prefix = xroute->dt.src_prefix;
-                last_src_plen = xroute->dt.src_plen;
+                last = &xroute->dt;
             } else if(route) {
                 unsigned char channels[MAX_CHANNEL_HOPS];
                 int chlen;
@@ -1473,10 +1463,7 @@ flushupdates(struct interface *ifp)
                 really_send_update(ifp, route->src->id, &route->src->dt,
                                    seqno, metric, channels, chlen);
                 update_source(route->src, seqno, metric);
-                last_prefix = route->src->dt.prefix;
-                last_plen = route->src->dt.plen;
-                last_src_prefix = route->src->dt.src_prefix;
-                last_src_plen = route->src->dt.src_plen;
+                last = &route->src->dt;
             } else {
             /* There's no route for this prefix.  This can happen shortly
                after an xroute has been retracted, so send a retraction. */
