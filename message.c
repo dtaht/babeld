@@ -1845,6 +1845,9 @@ send_unicast_request(struct neighbour *neigh, const struct datum *dt)
 {
     int rc, v4, pb, spb = 0, len, is_ss;
 
+    if(!if_up(neigh->ifp))
+        return;
+
     /* make sure any buffered updates go out before this request. */
     flushupdates(neigh->ifp);
 
@@ -1968,6 +1971,9 @@ send_unicast_multihop_request(struct neighbour *neigh, const struct datum *dt,
                               unsigned short hop_count)
 {
     int rc, v4, pb, spb = 0, len, is_ss;
+
+    if(!if_up(neigh->ifp))
+        return;
 
     /* Make sure any buffered updates go out before this request. */
     flushupdates(neigh->ifp);
