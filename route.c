@@ -1043,7 +1043,7 @@ consider_route(struct babel_route *route)
     if(installed && route->installed)
         send_triggered_update(route, installed->src, route_metric(installed));
     else
-        send_update(NULL, 1, &route->src->dt, 0);
+        send_update(NULL, 1, &route->src->dt);
     return;
 }
 
@@ -1109,7 +1109,7 @@ send_triggered_update(struct babel_route *route, struct source *oldsrc,
     if(urgent >= 2)
         send_update_resend(NULL, &route->src->dt);
     else
-        send_update(NULL, urgent, &route->src->dt, 0);
+        send_update(NULL, urgent, &route->src->dt);
 
     if(oldmetric < INFINITY) {
         if(newmetric >= oldmetric + 288) {

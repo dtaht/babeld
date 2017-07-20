@@ -285,7 +285,7 @@ do_resend()
                                           resend->seqno, resend->id, 127);
                     break;
                 case RESEND_UPDATE:
-                    send_update(resend->ifp, 1, &resend->dt, 0);
+                    send_update(resend->ifp, 1, &resend->dt);
                     break;
                 default: abort();
                 }

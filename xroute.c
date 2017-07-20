@@ -355,7 +355,7 @@ check_xroutes(int send_updates)
                 }
                 change = 1;
                 if(send_updates)
-                    send_update(NULL, 0, &routes[i].dt, 0);
+                    send_update(NULL, 0, &routes[i].dt);
             }
         }
     }

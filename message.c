@@ -756,9 +756,11 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                 goto done;
             is_ss = !is_default(dt.src_prefix, dt.src_plen);
             if(message[2] == 0) {
-                debugf("Received %srequest for any from %s on %s.\n",
-                       is_ss ? "ss-" : "",
+                debugf("Received wildcard request from %s on %s.\n",
                        format_address(from), ifp->name);
+                if(is_ss)
+                    fprintf(stderr,
+                            "Source Prefix received on wildcard request.");
                 /* If a neighbour is requesting a full route dump from us,
                    we might as well send it an IHU. */
                 send_ihu(neigh, NULL);
@@ -766,22 +768,16 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                    a large number of nodes at the same time may cause an
                    update storm.  Ignore a wildcard request that happens
                    shortly after we sent a full update. */
-                if(!is_ss) {
-                    if(neigh->ifp->last_update_time <
-                       now.tv_sec - MAX(neigh->ifp->hello_interval / 100, 1))
-                        send_update(neigh->ifp, 0, NULL, 1);
-                } else {
-                    if(neigh->ifp->last_specific_update_time <
-                       now.tv_sec - MAX(neigh->ifp->hello_interval / 100, 1))
-                        send_update(neigh->ifp, 0, NULL, 2);
-                }
+                if(neigh->ifp->last_update_time <
+                   now.tv_sec - MAX(neigh->ifp->hello_interval / 100, 1))
+                    send_update(neigh->ifp, 0, NULL);
             } else {
                 debugf("Received request for dst %s%s%s from %s on %s.\n",
                        message[2] == 0 ? "" : format_prefix(dt.prefix, dt.plen),
                        is_ss ? " src " : "",
                        is_ss ? format_prefix(dt.src_prefix, dt.src_plen) : "",
                        format_address(from), ifp->name);
-                send_update(neigh->ifp, 0, &dt, 0);
+                send_update(neigh->ifp, 0, &dt);
             }
         } else if(type == MESSAGE_MH_REQUEST) {
             struct datum dt;
@@ -1524,17 +1520,15 @@ buffer_update(struct interface *ifp, const struct datum *dt)
     ifp->num_buffered_updates++;
 }
 
-/* dt == NULL && op: 0 -- Full wildcard update,
-                     1 -- Legacy wildcard update,
-                     2 -- Source-specific wildcard update. */
+/* dt == NULL: wildcard update */
 void
-send_update(struct interface *ifp, int urgent, const struct datum *dt, int op)
+send_update(struct interface *ifp, int urgent, const struct datum *dt)
 {
     if(ifp == NULL) {
         struct interface *ifp_aux;
         struct babel_route *route;
         FOR_ALL_INTERFACES(ifp_aux)
-            send_update(ifp_aux, urgent, dt, 0);
+            send_update(ifp_aux, urgent, dt);
         if(dt) {
             /* Since flushupdates only deals with non-wildcard interfaces, we
                need to do this now. */
@@ -1556,19 +1550,13 @@ send_update(struct interface *ifp, int urgent, const struct datum *dt, int op)
     } else {
         struct route_stream *routes;
         send_self_update(ifp);
-        debugf("Sending update to %s for any%s.\n", ifp->name,
-               op == 2 ? " (legacy)" : op == 3 ? " (source-specific)" : "");
+        debugf("Sending a routing table dump to %s.\n", ifp->name);
         routes = route_stream(ROUTE_INSTALLED);
         if(routes) {
             while(1) {
-                int is_ss;
                 struct babel_route *route = route_stream_next(routes);
                 if(route == NULL)
                     break;
-                is_ss = !is_default(route->src->dt.src_prefix,
-                                    route->src->dt.src_plen);
-                if((op == 2 && is_ss) || (op == 3 && !is_ss))
-                    continue;
                 buffer_update(ifp, &route->src->dt);
             }
             route_stream_done(routes);
@@ -1576,10 +1564,7 @@ send_update(struct interface *ifp, int urgent, const struct datum *dt, int op)
             fprintf(stderr, "Couldn't allocate route stream.\n");
         }
         set_timeout(&ifp->update_timeout, ifp->update_interval);
-        if(op == 0 || op == 1)
-            ifp->last_update_time = now.tv_sec;
-        if(op == 0 || op == 2)
-            ifp->last_specific_update_time = now.tv_sec;
+        ifp->last_update_time = now.tv_sec;
     }
     schedule_update_flush(ifp, urgent);
 }
@@ -1589,7 +1574,7 @@ send_update_resend(struct interface *ifp, const struct datum *dt)
 {
     assert(dt->prefix != NULL);
 
-    send_update(ifp, 1, dt, 0);
+    send_update(ifp, 1, dt);
     record_resend(RESEND_UPDATE, dt, 0, NULL, NULL, resend_delay);
 }
 
@@ -1646,7 +1631,7 @@ send_self_update(struct interface *ifp)
         while(1) {
             struct xroute *xroute = xroute_stream_next(xroutes);
             if(xroute == NULL) break;
-            send_update(ifp, 0, &xroute->dt, 0);
+            send_update(ifp, 0, &xroute->dt);
         }
         xroute_stream_done(xroutes);
     } else {
@@ -2050,14 +2035,14 @@ handle_request(struct neighbour *neigh, const struct datum *dt,
                 update_myseqno();
             }
         }
-        send_update(neigh->ifp, 1, dt, 0);
+        send_update(neigh->ifp, 1, dt);
         return;
     }
 
     if(route &&
        (memcmp(id, route->src->id, 8) != 0 ||
         seqno_compare(seqno, route->seqno) <= 0)) {
-        send_update(neigh->ifp, 1, dt, 0);
+        send_update(neigh->ifp, 1, dt);
         return;
     }
 
