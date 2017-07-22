@@ -45,7 +45,7 @@ THE SOFTWARE.
 #define SUBTLV_PADN 1
 #define SUBTLV_DIVERSITY 2 /* Also known as babelz. */
 #define SUBTLV_TIMESTAMP 3 /* Used to compute RTT. */
-#define SUBTLV_SOURCE_PREFIX 250
+#define SUBTLV_SOURCE_PREFIX 128
 
 extern unsigned short myseqno;
 extern struct timeval seqno_time;
