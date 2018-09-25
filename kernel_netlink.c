@@ -962,6 +962,12 @@ kernel_has_ipv6_subtrees(void)
     return (kernel_older_than("Linux", 3, 11) == 0);
 }
 
+/* Someday we could make these globally settable to something like
+   32, as bird does */
+
+static int ipv4_metric = 0;
+static int ipv6_metric = 1024;
+
 int
 kernel_route(int operation, int table,
              const unsigned char *dest, unsigned short plen,
@@ -1100,7 +1106,7 @@ kernel_route(int operation, int table,
     rta->rta_type = RTA_PRIORITY;
 
     if(metric < KERNEL_INFINITY) {
-        *(int*)RTA_DATA(rta) = metric;
+        *(int*)RTA_DATA(rta) = ipv4 ? ipv4_metric : ipv6_metric;
         rta = RTA_NEXT(rta, len);
         rta->rta_len = RTA_LENGTH(sizeof(int));
         rta->rta_type = RTA_OIF;
@@ -1118,7 +1124,7 @@ kernel_route(int operation, int table,
             memcpy(RTA_DATA(rta), gate, sizeof(struct in6_addr));
         }
     } else {
-        *(int*)RTA_DATA(rta) = -1;
+        *(int*)RTA_DATA(rta) = ipv4 ? ipv4_metric : ipv6_metric;
     }
     buf.nh.nlmsg_len = (char*)rta + rta->rta_len - buf.raw;
 
