@@ -22,6 +22,7 @@ THE SOFTWARE.
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stddef.h>
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
@@ -40,6 +41,7 @@ THE SOFTWARE.
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/fib_rules.h>
+#include <linux/filter.h>
 #include <net/if_arp.h>
 
 /* From <linux/if_bridge.h> */
@@ -368,7 +370,8 @@ netlink_read(struct netlink *nl, struct netlink *nl_ignore, int answer,
             if(!answer)
                 done = 1;
             if(nl_ignore && nh->nlmsg_pid == nl_ignore->sockaddr.nl_pid) {
-                kdebugf("(ignore), ");
+                fprintf(stderr,"Message from self - we should not see this more than twice - ever\n");
+		kdebugf("(ignore), ");
                 continue;
             } else if(answer && (nh->nlmsg_pid != nl->sockaddr.nl_pid ||
                                  nh->nlmsg_seq != nl->seqno)) {
@@ -470,6 +473,7 @@ netlink_talk(struct nlmsghdr *nh)
 
     return rc;
 }
+
 
 static int
 netlink_send_dump(int type, void *data, int len) {
@@ -603,6 +607,40 @@ rtnlgrp_to_mask(unsigned int grp)
     return grp ? 1 << (grp - 1) : 0;
 }
 
+#define array_size(ar) (sizeof(ar) / sizeof(ar[0]))
+/* Filter out messages from self that occur on listener socket,
+   caused by our actions on the command socket
+ */
+
+static void netlink_install_filter (int sock, __u32 pid)
+{
+  struct sock_filter filter[] = {
+    /* 0: ldh [4]                 */
+    BPF_STMT(BPF_LD|BPF_ABS|BPF_H, offsetof(struct nlmsghdr, nlmsg_type)),
+    /* 1: jeq 0x18 jt 3 jf 6  */
+    BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, htons(RTM_NEWROUTE), 1, 0),
+    /* 2: jeq 0x19 jt 3 jf 6  */
+    BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, htons(RTM_DELROUTE), 0, 3),
+    /* 3: ldw [12]                */
+    BPF_STMT(BPF_LD|BPF_ABS|BPF_W, offsetof(struct nlmsghdr, nlmsg_pid)),
+    /* 4: jeq XX  jt 5 jf 6   */
+    BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, htonl(pid), 0, 1),
+    /* 5: ret 0    (skip)     */
+    BPF_STMT(BPF_RET|BPF_K, 0),
+    /* 6: ret 0xffff (keep)   */
+    BPF_STMT(BPF_RET|BPF_K, 0xffff),
+  };
+
+  struct sock_fprog prog = {
+    .len = array_size(filter),
+    .filter = filter,
+  };
+
+  if (setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER, &prog, sizeof(prog)) < 0)
+      fprintf(stderr,"Can't install socket filter for some reason - will see messages from self: %s\n",
+	      strerror(errno));
+}
+
 int
 kernel_setup_socket(int setup)
 {
@@ -625,6 +663,7 @@ kernel_setup_socket(int setup)
             return -1;
         }
 
+	netlink_install_filter(nl_listen.sock,getpid());
         kernel_socket = nl_listen.sock;
 
         return 1;
