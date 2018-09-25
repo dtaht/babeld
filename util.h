@@ -115,33 +115,81 @@ static inline bool xor4(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,4) != 0;
 }
 
-static inline bool xor8(const unsigned char *a, const unsigned char *b) {
-	return memcmp(a,b,8) != 0;
-}
-
 static inline bool xor12(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,12) != 0;
-}
-
-static inline bool xor16(const unsigned char *a, const unsigned char *b) {
-	return memcmp(a,b,16) != 0;
 }
 
 static inline bool xnor4(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,4) == 0 ;
 }
 
-static inline bool xnor8(const unsigned char *a, const unsigned char *b) {
-	return memcmp(a,b,8) == 0;
-}
-
 static inline bool xnor12(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,12) == 0;
 }
 
+#ifdef OLDVERSION
+static inline bool xor8(const unsigned char *a, const unsigned char *b) {
+	return memcmp(a,b,8) != 0;
+}
+
+static inline bool xnor8(const unsigned char *a, const unsigned char *b) {
+	return memcmp(a,b,8) == 0;
+}
+
+static inline bool xor16(const unsigned char *a, const unsigned char *b) {
+	return memcmp(a,b,16) != 0;
+}
 static inline bool xnor16(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,16) == 0;
 }
+#else
+
+#define HAVE_64BIT_ARCH 1
+static inline size_t xor16 (const unsigned char *p1,
+                                   const unsigned char *p2)
+{
+#ifdef  HAVE_64BIT_ARCH
+        const unsigned long *up1 = (const unsigned long *)p1;
+        const unsigned long *up2 = (const unsigned long *)p2;
+
+        return ((up1[0] ^ up2[0]) | (up1[1] ^ up2[1]));
+#else
+        const unsigned int *up1 = (const unsigned int *)p1;
+        const unsigned int *up2 = (const unsigned int *)p2;
+	return ((up1[0] ^ up2[0]) |
+                (up1[1] ^ up2[1]) |
+                (up1[2] ^ up2[2]) |
+                (up1[3] ^ up2[3]));
+#endif
+}
+static inline size_t xor8(const unsigned char *p1,
+                                   const unsigned char *p2)
+{
+#ifdef  HAVE_64BIT_ARCH
+        const unsigned long *up1 = (const unsigned long *)p1;
+        const unsigned long *up2 = (const unsigned long *)p2;
+        return (up1[0] ^ up2[0]);
+#else
+        const unsigned int *up1 = (const unsigned int *)p1;
+        const unsigned int *up2 = (const unsigned int *)p2;
+	return ((up1[0] ^ up2[0]) |
+                (up1[1] ^ up2[1]));
+#endif
+}
+
+static inline size_t xnor8(const unsigned char *p1,
+                                   const unsigned char *p2)
+{
+  return !xor8(p1,p2);
+}
+
+static inline size_t xnor16(const unsigned char *p1,
+                                   const unsigned char *p2)
+{
+  return !xor16(p1,p2);
+}
+
+#endif
 
 static inline int
 linklocal(const unsigned char *address)
