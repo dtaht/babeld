@@ -160,7 +160,7 @@ if_eui64(char *ifname, int ifindex, unsigned char *eui)
     case ARPHRD_INFINIBAND: {
         unsigned char *mac;
         mac = (unsigned char *)ifr.ifr_hwaddr.sa_data;
-        if(memcmp(mac, zeroes, 8) == 0 ||
+        if(xnor8(mac, zeroes) ||
            (mac[0] & 1) != 0 || (mac[0] & 2) != 0) {
             errno = ENOENT;
             return -1;
@@ -1015,7 +1015,7 @@ kernel_route(int operation, int table,
     }
 
     if(operation == ROUTE_MODIFY) {
-        if(newmetric == metric && memcmp(newgate, gate, 16) == 0 &&
+        if(newmetric == metric && xnor16(newgate, gate) &&
            newifindex == ifindex)
             return 0;
         /* It would be better to add the new route before removing the

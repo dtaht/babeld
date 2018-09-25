@@ -247,7 +247,7 @@ check_link_local_addresses(struct interface *ifp)
         if(rc == ifp->numll) {
             changed = 0;
             for(i = 0; i < rc; i++) {
-                if(memcmp(ifp->ll[i], ll[i].prefix, 16) != 0) {
+                if(xor16(ifp->ll[i], ll[i].prefix)) {
                     changed = 1;
                     break;
                 }
@@ -514,7 +514,7 @@ interface_ll_address(struct interface *ifp, const unsigned char *address)
         return 0;
 
     for(i = 0; i < ifp->numll; i++)
-        if(memcmp(ifp->ll[i], address, 16) == 0)
+        if(xnor16(ifp->ll[i], address))
             return 1;
 
     return 0;

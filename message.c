@@ -1300,9 +1300,9 @@ really_send_update(struct interface *ifp,
         real_src_plen = src_plen;
     }
 
-    if(!ifp->have_buffered_id || memcmp(id, ifp->buffered_id, 8) != 0) {
+    if(!ifp->have_buffered_id || xor8(id, ifp->buffered_id)) {
         if(!is_ss && real_plen == 128 &&
-           memcmp(real_prefix + 8, id, 8) == 0) {
+           xnor8(real_prefix + 8, id)) {
             flags |= 0x40;
         } else {
             start_message(ifp, MESSAGE_ROUTER_ID, 10);
@@ -1372,8 +1372,8 @@ compare_buffered_updates(const void *av, const void *bv)
     else if(v4a < v4b)
         return -1;
 
-    ma = (!v4a && a->plen == 128 && memcmp(a->prefix + 8, a->id, 8) == 0);
-    mb = (!v4b && b->plen == 128 && memcmp(b->prefix + 8, b->id, 8) == 0);
+    ma = (!v4a && a->plen == 128 && xnor8(a->prefix + 8, a->id));
+    mb = (!v4b && b->plen == 128 && xnor8(b->prefix + 8, b->id));
 
     if(ma > mb)
         return -1;
@@ -1451,8 +1451,8 @@ flushupdates(struct interface *ifp)
             if(last_prefix &&
                b[i].plen == last_plen &&
                b[i].src_plen == last_src_plen &&
-               memcmp(b[i].prefix, last_prefix, 16) == 0 &&
-               memcmp(b[i].src_prefix, last_src_prefix, 16) == 0)
+               xnor16(b[i].prefix, last_prefix) &&
+               xnor16(b[i].src_prefix, last_src_prefix))
                 continue;
 
             xroute = find_xroute(b[i].prefix, b[i].plen,
@@ -2155,7 +2155,7 @@ handle_request(struct neighbour *neigh, const unsigned char *prefix,
     route = find_installed_route(prefix, plen, src_prefix, src_plen);
 
     if(xroute && (!route || xroute->metric <= kernel_metric)) {
-        if(hop_count > 0 && memcmp(id, myid, 8) == 0) {
+        if(hop_count > 0 && xnor8(id, myid)) {
             if(seqno_compare(seqno, myseqno) > 0) {
                 if(seqno_minus(seqno, myseqno) > 100) {
                     /* Hopelessly out-of-date request */
@@ -2169,7 +2169,7 @@ handle_request(struct neighbour *neigh, const unsigned char *prefix,
     }
 
     if(route &&
-       (memcmp(id, route->src->id, 8) != 0 ||
+       (xor8(id, route->src->id) ||
         seqno_compare(seqno, route->seqno) <= 0)) {
         send_update(neigh->ifp, 1, prefix, plen, src_prefix, src_plen);
         return;
@@ -2178,7 +2178,7 @@ handle_request(struct neighbour *neigh, const unsigned char *prefix,
     if(hop_count <= 1)
         return;
 
-    if(route && memcmp(id, route->src->id, 8) == 0 &&
+    if(route && xnor8(id, route->src->id) &&
        seqno_minus(seqno, route->seqno) > 100) {
         /* Hopelessly out-of-date */
         return;

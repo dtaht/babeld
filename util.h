@@ -97,11 +97,63 @@ int parse_net(const char *net, unsigned char *prefix_r, unsigned char *plen_r,
 int parse_eui64(const char *eui, unsigned char *eui_r);
 int wait_for_fd(int direction, int fd, int msecs);
 int martian_prefix(const unsigned char *prefix, int plen) ATTRIBUTE ((pure));
-int linklocal(const unsigned char *address) ATTRIBUTE ((pure));
-int v4mapped(const unsigned char *address) ATTRIBUTE ((pure));
 void v4tov6(unsigned char *dst, const unsigned char *src);
 int daemonise(void);
 int set_src_prefix(unsigned char *src_addr, unsigned char *src_plen);
+
+/* Most of the time we only care if things are equal or unequal.
+   So we can use xor logic rather than memcmp. The tricky part is
+   that C considers any non-zero value to be true and 0 to be false,
+   where a simple XOR creates non-zero values for not equal */
+
+extern const unsigned char llprefix[16];
+extern const unsigned char v4prefix[16];
+
+#define bool int
+
+static inline bool xor4(const unsigned char *a, const unsigned char *b) {
+	return memcmp(a,b,4) != 0;
+}
+
+static inline bool xor8(const unsigned char *a, const unsigned char *b) {
+	return memcmp(a,b,8) != 0;
+}
+
+static inline bool xor12(const unsigned char *a, const unsigned char *b) {
+	return memcmp(a,b,12) != 0;
+}
+
+static inline bool xor16(const unsigned char *a, const unsigned char *b) {
+	return memcmp(a,b,16) != 0;
+}
+
+static inline bool xnor4(const unsigned char *a, const unsigned char *b) {
+	return memcmp(a,b,4) == 0 ;
+}
+
+static inline bool xnor8(const unsigned char *a, const unsigned char *b) {
+	return memcmp(a,b,8) == 0;
+}
+
+static inline bool xnor12(const unsigned char *a, const unsigned char *b) {
+	return memcmp(a,b,12) == 0;
+}
+
+static inline bool xnor16(const unsigned char *a, const unsigned char *b) {
+	return memcmp(a,b,16) == 0;
+}
+
+static inline int
+linklocal(const unsigned char *address)
+{
+    return xnor8(address, llprefix);
+}
+
+static inline int
+v4mapped(const unsigned char *address)
+{
+    return xnor12(address, v4prefix);
+}
 
 static inline int
 is_default(const unsigned char *prefix, int plen)
@@ -115,6 +167,7 @@ enum prefix_status {
     PST_MORE_SPECIFIC,
     PST_LESS_SPECIFIC
 };
+
 enum prefix_status
 prefix_cmp(const unsigned char *p1, unsigned char plen1,
            const unsigned char *p2, unsigned char plen2);

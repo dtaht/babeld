@@ -1200,7 +1200,7 @@ filter_match(struct filter *f, const unsigned char *id,
         }
     }
     if(f->id) {
-        if(!id || memcmp(f->id, id, 8) != 0)
+        if(!id || xor8(f->id, id))
             return 0;
     }
     if(f->prefix) {
@@ -1229,7 +1229,7 @@ filter_match(struct filter *f, const unsigned char *id,
             return 0;
     }
     if(f->neigh) {
-        if(!neigh || memcmp(f->neigh, neigh, 16) != 0)
+        if(!neigh || xor16(f->neigh, neigh))
             return 0;
     }
     if(f->ifname) {

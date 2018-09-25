@@ -1051,8 +1051,8 @@ static void
 dump_route(FILE *out, struct babel_route *route)
 {
     const unsigned char *nexthop =
-        memcmp(route->nexthop, route->neigh->address, 16) == 0 ?
-        NULL : route->nexthop;
+        xor16(route->nexthop, route->neigh->address) ?
+        route->nexthop : NULL;
     char channels[100];
 
     if(route->channels_len == 0) {

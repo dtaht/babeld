@@ -49,9 +49,9 @@ find_xroute(const unsigned char *prefix, unsigned char plen,
     int i;
     for(i = 0; i < numxroutes; i++) {
         if(xroutes[i].plen == plen &&
-           memcmp(xroutes[i].prefix, prefix, 16) == 0 &&
+           xnor16(xroutes[i].prefix, prefix) &&
            xroutes[i].src_plen == src_plen &&
-           memcmp(xroutes[i].src_prefix, src_prefix, 16) == 0)
+           xnor16(xroutes[i].src_prefix, src_prefix))
             return &xroutes[i];
     }
     return NULL;
@@ -309,7 +309,7 @@ check_xroutes(int send_updates)
         if(metric < INFINITY && metric == xroutes[i].metric) {
             for(j = 0; j < numroutes; j++) {
                 if(xroutes[i].plen == routes[j].plen &&
-                   memcmp(xroutes[i].prefix, routes[j].prefix, 16) == 0 &&
+                   xnor16(xroutes[i].prefix, routes[j].prefix) &&
                    xroutes[i].ifindex == routes[j].ifindex &&
                    xroutes[i].proto == routes[j].proto) {
                     export = 1;

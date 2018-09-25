@@ -158,7 +158,7 @@ find_route(const unsigned char *prefix, unsigned char plen,
     route = routes[i];
 
     while(route) {
-        if(route->neigh == neigh && memcmp(route->nexthop, nexthop, 16) == 0)
+        if(route->neigh == neigh && xnor16(route->nexthop, nexthop))
             return route;
         route = route->next;
     }
@@ -846,7 +846,7 @@ update_route(const unsigned char *id,
     int add_metric;
     int hold_time = MAX((4 * interval) / 100 + interval / 50, 15);
     int is_v4;
-    if(memcmp(id, myid, 8) == 0)
+    if(xnor8(id, myid))
         return NULL;
 
     if(martian_prefix(prefix, plen) || martian_prefix(src_prefix, src_plen)) {
@@ -867,7 +867,7 @@ update_route(const unsigned char *id,
 
     route = find_route(prefix, plen, src_prefix, src_plen, neigh, nexthop);
 
-    if(route && memcmp(route->src->id, id, 8) == 0)
+    if(route && xnor8(route->src->id, id))
         /* Avoid scanning the source table. */
         src = route->src;
     else
