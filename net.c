@@ -46,7 +46,7 @@ babel_socket(int port)
     int s, rc;
     int saved_errno;
     int one = 1, zero = 0;
-    const int ds = 0xc0;        /* CS6 - Network Control */
+    const int ds = 0xc2;        /* CS6 - Network Control + ECN */
 
     s = socket(PF_INET6, SOCK_DGRAM, 0);
     if(s < 0)
