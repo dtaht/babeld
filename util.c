@@ -445,8 +445,8 @@ martian_prefix(const unsigned char *prefix, int plen)
         (plen >= 128 && memcmp(prefix, zeroes, 15) == 0 &&
          (prefix[15] == 0 || prefix[15] == 1)) ||
         (plen >= 96 && v4mapped(prefix) &&
-         ((plen >= 104 && (prefix[12] == 127 || prefix[12] == 0)) ||
-          (plen >= 100 && (prefix[12] & 0xE0) == 0xE0)));
+         ((plen >= 104 && (prefix[12] == 127 || prefix[12] == 0))));
+// || (plen >= 100 && (prefix[12] & 0xE0) == 0xE0)));
 }
 
 void
