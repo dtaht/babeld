@@ -147,10 +147,10 @@ static inline bool xnor16(const unsigned char *a, const unsigned char *b) {
 
 #define HAVE_64BIT_ARCH 1
 
-// FIXME! make sure we have the full value
-
 static inline bool xor4(const unsigned char *a, const unsigned char *b) {
-	return (unsigned int) *a ^ (unsigned int) *b;
+        const unsigned int *up1 = (const unsigned int *)a;
+        const unsigned int *up2 = (const unsigned int *)b;
+	return *up1 ^ *up2;
 }
 
 static inline bool xnor4(const unsigned char *a, const unsigned char *b) {
@@ -182,11 +182,10 @@ static inline size_t xor12 (const unsigned char *p1,
 #ifdef  HAVE_64BIT_ARCH
         const unsigned long *up1 = (const unsigned long *)p1;
         const unsigned long *up2 = (const unsigned long *)p2;
-// FIXME casts ????
 	const unsigned int *sp1 = (const unsigned int *) &p1[12];
 	const unsigned int *sp2 = (const unsigned int *) &p2[12];
 	
-        return ((up1[0] ^ up2[0]) | (*sp1 ^ *sp2));
+        return ((up1[0] ^ up2[0]) | (sp1[0] ^ sp2[0]));
 #else
         const unsigned int *up1 = (const unsigned int *)p1;
         const unsigned int *up2 = (const unsigned int *)p2;
