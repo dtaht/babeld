@@ -249,7 +249,7 @@ normalize_prefix(unsigned char *restrict ret,
 const unsigned char v4prefix[16] =
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF, 0, 0, 0, 0 };
 
-const unsigned char llprefix[16] =
+static const unsigned char llprefix[16] =
     {0xFE, 0x80};
 
 const char *
@@ -445,8 +445,20 @@ martian_prefix(const unsigned char *prefix, int plen)
         (plen >= 128 && memcmp(prefix, zeroes, 15) == 0 &&
          (prefix[15] == 0 || prefix[15] == 1)) ||
         (plen >= 96 && v4mapped(prefix) &&
-         ((plen >= 104 && (prefix[12] == 127 || prefix[12] == 0)) ||
-          (plen >= 100 && (prefix[12] & 0xE0) == 0xE0)));
+         ((plen >= 104 && (prefix[12] == 127 || prefix[12] == 0)));
+          //(plen >= 100 && (prefix[12] & 0xE0) == 0xE0)));
+}
+
+int
+linklocal(const unsigned char *address)
+{
+    return memcmp(address, llprefix, 8) == 0;
+}
+
+int
+v4mapped(const unsigned char *address)
+{
+    return memcmp(address, v4prefix, 12) == 0;
 }
 
 void
