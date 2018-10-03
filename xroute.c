@@ -49,8 +49,8 @@ find_xroute(const unsigned char *prefix, unsigned char plen,
     int i;
     for(i = 0; i < numxroutes; i++) {
         if(xroutes[i].plen == plen &&
-           xnor16(xroutes[i].prefix, prefix) &&
            xroutes[i].src_plen == src_plen &&
+           xnor16(xroutes[i].prefix, prefix) &&
            xnor16(xroutes[i].src_prefix, src_prefix))
             return &xroutes[i];
     }
