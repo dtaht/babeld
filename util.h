@@ -111,7 +111,6 @@ extern const unsigned char v4prefix[16];
 
 #define bool int
 
-
 #ifdef OLDVERSION
 static inline bool xor4(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,4) != 0;
@@ -140,6 +139,7 @@ static inline bool xnor8(const unsigned char *a, const unsigned char *b) {
 static inline bool xor16(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,16) != 0;
 }
+
 static inline bool xnor16(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,16) == 0;
 }
@@ -154,12 +154,12 @@ static inline bool xorx(const unsigned char *a, const unsigned char *b, int len)
 
 #else
 
-#define HAVE_64BIT_ARCH 1
+// #define HAVE_64BIT_ARCH 1
 
 static inline bool xor4(const unsigned char *a, const unsigned char *b) {
         const unsigned int *up1 = (const unsigned int *)a;
         const unsigned int *up2 = (const unsigned int *)b;
-	return *up1 ^ *up2;
+	return up1[0] ^ up2[0];
 }
 
 static inline bool xnor4(const unsigned char *a, const unsigned char *b) {
@@ -167,7 +167,7 @@ static inline bool xnor4(const unsigned char *a, const unsigned char *b) {
 }
 
 static inline size_t xor16 (const unsigned char *p1,
-                                   const unsigned char *p2)
+			    const unsigned char *p2)
 {
 #ifdef  HAVE_64BIT_ARCH
         const unsigned long *up1 = (const unsigned long *)p1;
@@ -184,27 +184,25 @@ static inline size_t xor16 (const unsigned char *p1,
 #endif
 }
 
-
 static inline size_t xor12 (const unsigned char *p1,
-                                   const unsigned char *p2)
+			    const unsigned char *p2)
 {
 #ifdef  HAVE_64BIT_ARCH
         const unsigned long *up1 = (const unsigned long *)p1;
         const unsigned long *up2 = (const unsigned long *)p2;
-	const unsigned int *sp1 = (const unsigned int *) &p1[12];
-	const unsigned int *sp2 = (const unsigned int *) &p2[12];
+	const unsigned int *sp1 = (const unsigned int *) &p1[8];
+	const unsigned int *sp2 = (const unsigned int *) &p2[8];
 	
         return ((up1[0] ^ up2[0]) | (sp1[0] ^ sp2[0]));
 #else
         const unsigned int *up1 = (const unsigned int *)p1;
         const unsigned int *up2 = (const unsigned int *)p2;
-	return ((up1[0] ^ up2[0]) |
-                (up1[1] ^ up2[1]) |
-                (up1[2] ^ up2[2]);
+	return ((up1[0] ^ up2[0]) | (up1[1] ^ up2[1]) |
+                (up1[2] ^ up2[2]));
 #endif
 }
 static inline size_t xor8(const unsigned char *p1,
-                                   const unsigned char *p2)
+			  const unsigned char *p2)
 {
 #ifdef  HAVE_64BIT_ARCH
         const unsigned long *up1 = (const unsigned long *)p1;
@@ -219,20 +217,20 @@ static inline size_t xor8(const unsigned char *p1,
 }
 
 static inline size_t xnor12(const unsigned char *p1,
-                                   const unsigned char *p2)
+			    const unsigned char *p2)
 {
   return !xor12(p1,p2);
 }
 
 
 static inline size_t xnor8(const unsigned char *p1,
-                                   const unsigned char *p2)
+			   const unsigned char *p2)
 {
   return !xor8(p1,p2);
 }
 
 static inline size_t xnor16(const unsigned char *p1,
-                                   const unsigned char *p2)
+			    const unsigned char *p2)
 {
   return !xor16(p1,p2);
 }
