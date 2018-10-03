@@ -1024,6 +1024,10 @@ kernel_route(int operation, int table,
            silently fail the request, causing "stuck" routes.  Let's
            stick with the naive approach, and hope that the window is
            small enough to be negligible. */
+        kernel_route(ROUTE_ADD, newtable, dest, plen,
+                          src, src_plen,
+                          newgate, newifindex, newmetric + 1,
+                          NULL, 0, 0, 0);
         kernel_route(ROUTE_FLUSH, table, dest, plen,
                      src, src_plen,
                      gate, ifindex, metric,
@@ -1031,6 +1035,10 @@ kernel_route(int operation, int table,
         rc = kernel_route(ROUTE_ADD, newtable, dest, plen,
                           src, src_plen,
                           newgate, newifindex, newmetric,
+                          NULL, 0, 0, 0);
+        kernel_route(ROUTE_FLUSH, newtable, dest, plen,
+                          src, src_plen,
+                          newgate, newifindex, newmetric + 1,
                           NULL, 0, 0, 0);
         if(rc < 0) {
             if(errno == EEXIST)
@@ -1048,7 +1056,8 @@ kernel_route(int operation, int table,
     kdebugf("kernel_route: %s %s from %s "
             "table %d metric %d dev %d nexthop %s\n",
             operation == ROUTE_ADD ? "add" :
-            operation == ROUTE_FLUSH ? "flush" : "???",
+            operation == ROUTE_FLUSH ? "flush" : 
+            operation == ROUTE_MODIFY ? "replace" : "???",
             format_prefix(dest, plen), format_prefix(src, src_plen),
             table, metric, ifindex, format_address(gate));
 
@@ -1106,7 +1115,7 @@ kernel_route(int operation, int table,
     rta->rta_type = RTA_PRIORITY;
 
     if(metric < KERNEL_INFINITY) {
-        *(int*)RTA_DATA(rta) = ipv4 ? ipv4_metric : ipv6_metric;
+        *(int*)RTA_DATA(rta) = metric;
         rta = RTA_NEXT(rta, len);
         rta->rta_len = RTA_LENGTH(sizeof(int));
         rta->rta_type = RTA_OIF;
@@ -1124,7 +1133,7 @@ kernel_route(int operation, int table,
             memcpy(RTA_DATA(rta), gate, sizeof(struct in6_addr));
         }
     } else {
-        *(int*)RTA_DATA(rta) = ipv4 ? ipv4_metric : ipv6_metric;
+        *(int*)RTA_DATA(rta) = ipv4 ? ipv4_metric + metric - KERNEL_INFINITY : ipv6_metric + metric - KERNEL_INFINITY;
     }
     buf.nh.nlmsg_len = (char*)rta + rta->rta_len - buf.raw;
 
