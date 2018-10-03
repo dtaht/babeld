@@ -143,6 +143,15 @@ static inline bool xor16(const unsigned char *a, const unsigned char *b) {
 static inline bool xnor16(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,16) == 0;
 }
+
+static inline bool xnorx(const unsigned char *a, const unsigned char *b, int len) {
+	return memcmp(a,b,len) == 0;
+}
+
+static inline bool xorx(const unsigned char *a, const unsigned char *b, int len) {
+	return memcmp(a,b,len) != 0;
+}
+
 #else
 
 // #define HAVE_64BIT_ARCH 1
@@ -226,6 +235,34 @@ static inline size_t xnor16(const unsigned char *p1,
   return !xor16(p1,p2);
 }
 
+// improveme
+
+static inline size_t xorx(const unsigned char *a, const unsigned char *b, int len) {
+	switch(len) {
+		case 0: return 0;
+		case 4: return xor4(a,b);
+		case 8: return xor8(a,b);
+		case 12: return xor12(a,b);
+		case 16: return xor16(a,b);
+		case 1: 
+		case 2:
+		case 3:
+		case 5: 
+		case 6: 
+		case 7: 
+		case 9: 
+		case 10: 
+		case 11:
+		case 13:
+		case 14:
+		case 15:
+		default: return memcmp(a,b,len) != 0;
+	}
+}
+
+static inline size_t xnorx(const unsigned char *a, const unsigned char *b, int len) {
+	return !xorx(a,b,len);
+}
 #endif
 
 static inline int

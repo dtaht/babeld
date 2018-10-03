@@ -218,7 +218,7 @@ in_prefix(const unsigned char *restrict address,
     if(plen > 128)
         plen = 128;
 
-    if(memcmp(address, prefix, plen / 8) != 0)
+    if(xorx(address, prefix, plen / 8))
         return 0;
 
     if(plen % 8 == 0)
@@ -442,7 +442,7 @@ martian_prefix(const unsigned char *prefix, int plen)
     return
         (plen >= 8 && prefix[0] == 0xFF) ||
         (plen >= 10 && prefix[0] == 0xFE && (prefix[1] & 0xC0) == 0x80) ||
-        (plen >= 128 && memcmp(prefix, zeroes, 15) == 0 &&
+        (plen >= 128 && xnorx(prefix, zeroes, 15) &&
          (prefix[15] == 0 || prefix[15] == 1)) ||
         (plen >= 96 && v4mapped(prefix) &&
          ((plen >= 104 && (prefix[12] == 127 || prefix[12] == 0))));
@@ -484,7 +484,7 @@ prefix_cmp(const unsigned char *p1, unsigned char plen1,
 {
     int plen = MIN(plen1, plen2);
 
-    if(memcmp(p1, p2, plen / 8) != 0)
+    if(xorx(p1, p2, plen / 8))
         return PST_DISJOINT;
 
     if(plen % 8 != 0) {
