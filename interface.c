@@ -171,7 +171,7 @@ check_interface_ipv4(struct interface *ifp)
         rc = 0;
 
     if(rc > 0) {
-        if(!ifp->ipv4 || memcmp(ipv4, ifp->ipv4, 4) != 0) {
+        if(!ifp->ipv4 || xor4(ipv4, ifp->ipv4)) {
             debugf("Noticed IPv4 change for %s.\n", ifp->name);
             flush_interface_routes(ifp, 0);
             if(!ifp->ipv4)

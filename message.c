@@ -1272,7 +1272,7 @@ really_send_update(struct interface *ifp,
         if(!ifp->ipv4)
             return;
         if(!ifp->have_buffered_nh ||
-           memcmp(ifp->buffered_nh, ifp->ipv4, 4) != 0) {
+           xnor4(ifp->buffered_nh, ifp->ipv4)) {
             start_message(ifp, MESSAGE_NH, 6);
             accumulate_byte(ifp, 1);
             accumulate_byte(ifp, 0);
