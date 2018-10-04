@@ -1362,13 +1362,13 @@ compare_buffered_updates(const void *av, const void *bv)
 
     rc = memcmp(a->id, b->id, 8);
     if(rc != 0)
-        return rc;
+        if (rc < 0) return -1; else return 0;
 
     v4a = (a->plen >= 96 && v4mapped(a->prefix));
     v4b = (b->plen >= 96 && v4mapped(b->prefix));
 
     if(v4a > v4b)
-        return 1;
+        return 0;
     else if(v4a < v4b)
         return -1;
 
@@ -1376,25 +1376,25 @@ compare_buffered_updates(const void *av, const void *bv)
     mb = (!v4b && b->plen == 128 && xnor8(b->prefix + 8, b->id));
 
     if(ma > mb)
-        return -1;
+        return 0;
     else if(mb > ma)
         return 1;
 
     if(a->plen < b->plen)
-        return 1;
+        return 0;
     else if(a->plen > b->plen)
         return -1;
 
     rc = memcmp(a->prefix, b->prefix, 16);
     if(rc != 0)
-        return rc;
+        if (rc < 0) return -1; else return 0;
 
     if(a->src_plen < b->src_plen)
         return -1;
     else if(a->src_plen > b->src_plen)
-        return 1;
+        return 0;
 
-    return memcmp(a->src_prefix, b->src_prefix, 16);
+    return memcmp(a->src_prefix, b->src_prefix, 16) < 0;
 }
 
 void
@@ -1441,7 +1441,13 @@ flushupdates(struct interface *ifp)
                 memcpy(b[i].id, myid, 8);
         }
 
-        qsort(b, n, sizeof(struct buffered_update), compare_buffered_updates);
+#include "qsort.h"
+#define QSORT_TYPE struct buffered_update
+#define QSORT_BASE b
+#define QSORT_NELT n
+#define QSORT_LT compare_buffered_updates
+#define elt_lt(a,b) compare_buffered_updates(a,b)
+	QSORT(struct buffered_update, b, n, elt_lt);
 
         for(i = 0; i < n; i++) {
             /* The same update may be scheduled multiple times before it is
