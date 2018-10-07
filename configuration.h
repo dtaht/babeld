@@ -30,23 +30,23 @@ THE SOFTWARE.
 #define CONFIG_ACTION_NO 5
 
 struct filter_result {
-    unsigned int add_metric; /* allow = 0, deny = INF, metric = <0..INF> */
     unsigned char *src_prefix;
-    unsigned char src_plen;
+    unsigned int add_metric; /* allow = 0, deny = INF, metric = <0..INF> */
     unsigned int table;
+    unsigned char src_plen;
 };
 
 struct filter {
     int af;
-    char *ifname;
     unsigned int ifindex;
+    char *ifname;
     unsigned char *id;
     unsigned char *prefix;
     unsigned char plen;
     unsigned char plen_ge, plen_le;
-    unsigned char *src_prefix;
     unsigned char src_plen;
     unsigned char src_plen_ge, src_plen_le;
+    unsigned char *src_prefix;
     unsigned char *neigh;
     int proto;                  /* May be negative */
     struct filter_result action;

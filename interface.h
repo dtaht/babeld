@@ -26,7 +26,7 @@ struct buffered_update {
     unsigned char src_prefix[16];
     unsigned char plen;
     unsigned char src_plen;
-    unsigned char pad[2];
+    unsigned char pad[2]; // FIXME pad better for 64 bit
 };
 
 #define IF_TYPE_DEFAULT 0

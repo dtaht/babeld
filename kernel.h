@@ -27,8 +27,8 @@ THE SOFTWARE.
 
 struct kernel_route {
     unsigned char prefix[16];
-    int plen;
     unsigned char src_prefix[16];
+    int plen;
     int src_plen;
     int metric;
     unsigned int ifindex;

@@ -34,8 +34,8 @@ struct neighbour {
     struct hello_history hello;
     struct hello_history uhello; /* for Unicast hellos */
     unsigned short txcost;
-    struct timeval ihu_time;
     unsigned short ihu_interval;   /* in centiseconds */
+    struct timeval ihu_time;
     /* Used for RTT estimation. */
     /* Absolute time (modulo 2^32) at which the Hello was sent,
        according to remote clock. */
