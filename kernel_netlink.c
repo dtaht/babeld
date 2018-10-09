@@ -990,9 +990,10 @@ kernel_route(int operation, int table,
              unsigned int newmetric, int newtable)
 {
     char buf[1024];
-    if(operation == ROUTE_MODIFY &&
-       ((metric >= INFINITY && newmetric < INFINITY) ||
-	(metric < INFINITY && newmetric >= INFINITY))) {
+    if(operation == ROUTE_MODIFY && newmetric >= INFINITY)
+//      ((metric >= INFINITY && newmetric < INFINITY) ||
+//	(metric < INFINITY && newmetric >= INFINITY)))
+{
       kernel_route(ROUTE_FLUSH, table,
 		   dest, plen, src, src_plen,
 		   gate, ifindex, metric,
@@ -1002,31 +1003,38 @@ kernel_route(int operation, int table,
       // this is why this is wrong because it's called elsewhere wrong
       // we need to know the old metric to detect the transition
       
-      return kernel_route(ROUTE_ADD, newtable,
+      return kernel_route(ROUTE_ADD, table,
 			  dest, plen, src, src_plen,
-			  newgate, newifindex, newmetric,
-			  gate, ifindex, metric, table);
+			  gate, ifindex, metric,
+			  newgate, newifindex, newmetric, newtable);
     }
 
-    if(metric >= INFINITY) {
+    if(newmetric >= INFINITY) {
       switch(operation) {
       case ROUTE_MODIFY:
-    	sprintf(buf,"ip route replace unreachable %s from %s "
-		"table %d metric %d dev %s via %s proto 42\n",
+    	sprintf(buf,"ip route add unreachable %s from %s "
+		"table %d metric %d proto 42\n",
 		format_prefix(dest, plen), format_prefix(src, src_plen),
-		table, 0, "eno1" , format_address(newgate));
+		table, 0);
+	//, "eno1" , format_address(newgate));
 	break;
       case ROUTE_FLUSH:
+	if(metric >= INFINITY)
     	sprintf(buf,"ip route del %s from %s "
 		"table %d metric %d proto 42\n",
 		format_prefix(dest, plen), format_prefix(src, src_plen),
 		table, 0);
+	else
+	sprintf(buf,"ip route del %s from %s "
+		"table %d metric %d dev %s via %s proto 42\n",
+		format_prefix(dest, plen), format_prefix(src, src_plen),
+		table, 0, "eno1", format_address(gate) );
 	break;
       case ROUTE_ADD:
     	sprintf(buf,"ip route add unreachable %s from %s "
 		"table %d metric %d proto 42\n",
 		format_prefix(dest, plen), format_prefix(src, src_plen),
-		table, 0);
+		newtable, 0);
 	break;
       }
     } else {
@@ -1038,6 +1046,12 @@ kernel_route(int operation, int table,
 		newtable, 0, "eno1" , format_address(newgate));
 	break;
       case ROUTE_FLUSH:
+	if(metric >= INFINITY)
+	sprintf(buf,"ip route del %s from %s "
+		"table %d metric %d proto 42\n",
+		format_prefix(dest, plen), format_prefix(src, src_plen),
+		table, 0 );
+	else
 	sprintf(buf,"ip route del %s from %s "
 		"table %d metric %d dev %s via %s proto 42\n",
 		format_prefix(dest, plen), format_prefix(src, src_plen),
@@ -1047,7 +1061,7 @@ kernel_route(int operation, int table,
 	sprintf(buf,"ip route add %s from %s "
 		"table %d metric %d dev %s via %s proto 42\n",
 		format_prefix(dest, plen), format_prefix(src, src_plen),
-		table, 0, "eno1" , format_address(gate));
+		newtable, 0, "eno1" , format_address(newgate));
 	break;
       }
     }

@@ -218,9 +218,11 @@ add_route(const struct zone *zone, const struct babel_route *route)
                            zone->src_prefix, zone->src_plen);
     return kernel_route(ROUTE_ADD, table, zone->dst_prefix, zone->dst_plen,
                         zone->src_prefix, zone->src_plen,
-                        route->nexthop,
+                        NULL,
                         route->neigh->ifp->ifindex,
-                        metric_to_kernel(route_metric(route)), NULL, 0, 0, 0);
+                        metric_to_kernel(route_metric(route)),
+			route->nexthop, route->neigh->ifp->ifindex,
+			metric_to_kernel(route_metric(route)), table);
 }
 
 static int
