@@ -25,8 +25,8 @@ THE SOFTWARE.
 struct source {
     unsigned char id[8];
     unsigned char prefix[16];
-    unsigned char plen;
     unsigned char src_prefix[16];
+    unsigned char plen;
     unsigned char src_plen;
     unsigned short seqno;
     unsigned short metric;
