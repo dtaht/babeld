@@ -1039,9 +1039,9 @@ kernel_route(int operation, int table,
 	break;
       case ROUTE_FLUSH:
 	sprintf(buf,"ip route del %s from %s "
-		"table %d metric %d dev %s proto 42\n",
+		"table %d metric %d dev %s via %s proto 42\n",
 		format_prefix(dest, plen), format_prefix(src, src_plen),
-		table, 0, "eno1" );
+		table, 0, "eno1", format_address(gate) );
 	break;
       case ROUTE_ADD:
 	sprintf(buf,"ip route add %s from %s "
