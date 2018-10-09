@@ -968,8 +968,61 @@ kernel_has_ipv6_subtrees(void)
 static int ipv4_metric = 0;
 static int ipv6_metric = 1024;
 
+// Could it be something as stupid as newgate not working?
+// broken up from up top?
+// This 
 int
 kernel_route(int operation, int table,
+             const unsigned char *dest, unsigned short plen,
+             const unsigned char *src, unsigned short src_plen,
+             const unsigned char *gate, int ifindex, unsigned int metric,
+             const unsigned char *newgate, int newifindex,
+             unsigned int newmetric, int newtable)
+{
+    char buf[1024];
+    if(newmetric >= INFINITY) {
+      if(operation == ROUTE_MODIFY) {
+    	sprintf(buf,"ip route %s unreachable %s from %s "
+		"table %d metric %d dev %s via %s proto 42\n",
+		operation == ROUTE_ADD ? "add" :
+		operation == ROUTE_FLUSH ? "flush" : 
+		operation == ROUTE_MODIFY ? "replace" : "???",
+		format_prefix(dest, plen), format_prefix(src, src_plen),
+		table, 0, "eno1" , format_address(newgate));
+      } else {
+    	sprintf(buf,"ip route %s unreachable %s from %s "
+		"table %d metric %d dev %s via %s proto 42\n",
+		operation == ROUTE_ADD ? "add" :
+		operation == ROUTE_FLUSH ? "flush" : 
+		operation == ROUTE_MODIFY ? "replace" : "???",
+		format_prefix(dest, plen), format_prefix(src, src_plen),
+		table, 0, "eno1" , format_address(gate));
+      }
+    } else {
+      if(operation == ROUTE_MODIFY) {
+	sprintf(buf,"ip route %s %s from %s "
+		"table %d metric %d dev %s via %s proto 42\n",
+		operation == ROUTE_ADD ? "add" :
+		operation == ROUTE_FLUSH ? "flush" : 
+		operation == ROUTE_MODIFY ? "replace" : "???",
+		format_prefix(dest, plen), format_prefix(src, src_plen),
+		newtable, 0, "eno1" , format_address(newgate));
+      } else {
+	sprintf(buf,"ip route %s %s from %s "
+		"table %d metric %d dev %s via %s proto 42\n",
+		operation == ROUTE_ADD ? "add" :
+		operation == ROUTE_FLUSH ? "flush" : 
+		operation == ROUTE_MODIFY ? "replace" : "???",
+		format_prefix(dest, plen), format_prefix(src, src_plen),
+		table, 0, "eno1" , format_address(gate));
+      }
+    }
+    printf(buf);
+    return system(buf);
+}
+
+int
+kernel_route2(int operation, int table,
              const unsigned char *dest, unsigned short plen,
              const unsigned char *src, unsigned short src_plen,
              const unsigned char *gate, int ifindex, unsigned int metric,
@@ -981,7 +1034,9 @@ kernel_route(int operation, int table,
     struct rtattr *rta;
     int len = sizeof(buf.raw);
     int rc, ipv4, use_src = 0;
-
+    unsigned char * origgate = gate;
+    // iffindex can be zero!?
+    
     if(!nl_setup) {
         fprintf(stderr,"kernel_route: netlink not initialized.\n");
         errno = EIO;
@@ -1016,7 +1071,7 @@ kernel_route(int operation, int table,
 
     if(operation == ROUTE_MODIFY) {
 	if(newmetric == metric && xnor16(newgate, gate) &&
-           newifindex == ifindex)
+           newifindex == ifindex && table == newtable)
             return 0;
 
 	/* We can't do a clean modify unless we are only
@@ -1049,7 +1104,11 @@ kernel_route(int operation, int table,
     memset(buf.raw, 0, sizeof(buf.raw));
     switch(operation) {
     	case ROUTE_MODIFY: 
-        buf.nh.nlmsg_flags = NLM_F_REQUEST | NLM_F_EXCL | NLM_F_REPLACE ;
+        buf.nh.nlmsg_flags = NLM_F_REQUEST | NLM_F_CREATE | NLM_F_REPLACE ;
+        buf.nh.nlmsg_type = RTM_NEWROUTE;
+	break;
+    	case ROUTE_ADD_HARDER: 
+        buf.nh.nlmsg_flags = NLM_F_REQUEST | NLM_F_REPLACE;
         buf.nh.nlmsg_type = RTM_NEWROUTE;
 	break;
     	case ROUTE_ADD: 
@@ -1136,16 +1195,21 @@ kernel_route(int operation, int table,
             format_prefix(dest, plen), format_prefix(src, src_plen),
             table, metric, ifindex, format_address(gate));
 
-	if(errno == EEXIST && operation == ROUTE_ADD) return 1;
-
-	if(operation == ROUTE_MODIFY) {
-	printf("Modify failed, trying add\n");
-	return(kernel_route(ROUTE_ADD, newtable, dest, plen,
+	if(errno == EEXIST && operation == ROUTE_ADD) 
+		return(kernel_route(ROUTE_ADD_HARDER, table, dest, plen,
                          src, src_plen,
-                         newgate, newifindex, newmetric,
-                         NULL, 0, 0, 0));
+				    gate, ifindex, metric,
+                         newgate, newifindex, newmetric, newtable));
+
+	/*	if(operation == ROUTE_MODIFY) {
+	printf("Modify failed, trying add\n");
+	return(kernel_route(ROUTE_ADD, 22, dest, plen,
+                         src, src_plen,
+                         origgate, newifindex, newmetric,
+                         newgate, newifindex, newmetric, newtable));
+			 } */
 	}
-	}
+    if (errno == EEXIST && operation == ROUTE_MODIFY ) rc = 0;
     return rc;
 }
 
