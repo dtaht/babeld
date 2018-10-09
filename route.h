@@ -27,20 +27,20 @@ THE SOFTWARE.
 
 struct babel_route {
     struct source *src;
+    struct babel_route *next;
+    short installed;
+    short channels_len;
     unsigned short refmetric;
     unsigned short cost;
     unsigned short add_metric;
     unsigned short seqno;
+    unsigned short hold_time;    /* in seconds */
+    unsigned short smoothed_metric; /* for route selection */
     struct neighbour *neigh;
     unsigned char nexthop[16];
     time_t time;
-    unsigned short hold_time;    /* in seconds */
-    unsigned short smoothed_metric; /* for route selection */
     time_t smoothed_metric_time;
-    short installed;
-    short channels_len;
     unsigned char *channels;
-    struct babel_route *next;
 };
 
 #define ROUTE_ALL 0

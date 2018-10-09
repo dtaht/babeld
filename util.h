@@ -102,7 +102,7 @@ int daemonise(void);
 int set_src_prefix(unsigned char *src_addr, unsigned char *src_plen);
 
 /* Most of the time we only care if things are equal or unequal.
-   So we can use xor logic rather than memcmp. The tricky part is
+   So we can use memeq logic rather than memcmp. The tricky part is
    that C considers any non-zero value to be true and 0 to be false,
    where a simple XOR creates non-zero values for not equal */
 
@@ -112,43 +112,43 @@ extern const unsigned char v4prefix[16];
 #define bool int
 
 #ifdef OLDVERSION
-static inline bool xor4(const unsigned char *a, const unsigned char *b) {
+static inline bool memeq4(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,4) != 0;
 }
 
-static inline bool xnor4(const unsigned char *a, const unsigned char *b) {
+static inline bool memneq4(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,4) == 0 ;
 }
 
-static inline bool xor12(const unsigned char *a, const unsigned char *b) {
+static inline bool memeq12(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,12) != 0;
 }
 
-static inline bool xnor12(const unsigned char *a, const unsigned char *b) {
+static inline bool memneq12(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,12) == 0;
 }
 
-static inline bool xor8(const unsigned char *a, const unsigned char *b) {
+static inline bool memeq8(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,8) != 0;
 }
 
-static inline bool xnor8(const unsigned char *a, const unsigned char *b) {
+static inline bool memneq8(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,8) == 0;
 }
 
-static inline bool xor16(const unsigned char *a, const unsigned char *b) {
+static inline bool memeq16(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,16) != 0;
 }
 
-static inline bool xnor16(const unsigned char *a, const unsigned char *b) {
+static inline bool memneq16(const unsigned char *a, const unsigned char *b) {
 	return memcmp(a,b,16) == 0;
 }
 
-static inline bool xnorx(const unsigned char *a, const unsigned char *b, int len) {
+static inline bool memneqx(const unsigned char *a, const unsigned char *b, int len) {
 	return memcmp(a,b,len) == 0;
 }
 
-static inline bool xorx(const unsigned char *a, const unsigned char *b, int len) {
+static inline bool memeqx(const unsigned char *a, const unsigned char *b, int len) {
 	return memcmp(a,b,len) != 0;
 }
 
@@ -156,17 +156,17 @@ static inline bool xorx(const unsigned char *a, const unsigned char *b, int len)
 
 // #define HAVE_64BIT_ARCH 1
 
-static inline bool xor4(const unsigned char *a, const unsigned char *b) {
+static inline bool memeq4(const unsigned char *a, const unsigned char *b) {
         const unsigned int *up1 = (const unsigned int *)a;
         const unsigned int *up2 = (const unsigned int *)b;
 	return up1[0] ^ up2[0];
 }
 
-static inline bool xnor4(const unsigned char *a, const unsigned char *b) {
-	return !xor4(a,b);
+static inline bool memneq4(const unsigned char *a, const unsigned char *b) {
+	return !memeq4(a,b);
 }
 
-static inline size_t xor16 (const unsigned char *p1,
+static inline size_t memeq16 (const unsigned char *p1,
 			    const unsigned char *p2)
 {
 #ifdef  HAVE_64BIT_ARCH
@@ -184,7 +184,7 @@ static inline size_t xor16 (const unsigned char *p1,
 #endif
 }
 
-static inline size_t xor12 (const unsigned char *p1,
+static inline size_t memeq12 (const unsigned char *p1,
 			    const unsigned char *p2)
 {
 #ifdef  HAVE_64BIT_ARCH
@@ -201,7 +201,7 @@ static inline size_t xor12 (const unsigned char *p1,
                 (up1[2] ^ up2[2]));
 #endif
 }
-static inline size_t xor8(const unsigned char *p1,
+static inline size_t memeq8(const unsigned char *p1,
 			  const unsigned char *p2)
 {
 #ifdef  HAVE_64BIT_ARCH
@@ -216,34 +216,34 @@ static inline size_t xor8(const unsigned char *p1,
 #endif
 }
 
-static inline size_t xnor12(const unsigned char *p1,
+static inline size_t memneq12(const unsigned char *p1,
 			    const unsigned char *p2)
 {
-  return !xor12(p1,p2);
+  return !memeq12(p1,p2);
 }
 
 
-static inline size_t xnor8(const unsigned char *p1,
+static inline size_t memneq8(const unsigned char *p1,
 			   const unsigned char *p2)
 {
-  return !xor8(p1,p2);
+  return !memeq8(p1,p2);
 }
 
-static inline size_t xnor16(const unsigned char *p1,
+static inline size_t memneq16(const unsigned char *p1,
 			    const unsigned char *p2)
 {
-  return !xor16(p1,p2);
+  return !memeq16(p1,p2);
 }
 
 // improveme
 
-static inline size_t xorx(const unsigned char *a, const unsigned char *b, int len) {
+static inline size_t memeqx(const unsigned char *a, const unsigned char *b, int len) {
 	switch(len) {
 		case 0: return 0;
-		case 4: return xor4(a,b);
-		case 8: return xor8(a,b);
-		case 12: return xor12(a,b);
-		case 16: return xor16(a,b);
+		case 4: return memeq4(a,b);
+		case 8: return memeq8(a,b);
+		case 12: return memeq12(a,b);
+		case 16: return memeq16(a,b);
 		case 1: 
 		case 2:
 		case 3:
@@ -260,21 +260,21 @@ static inline size_t xorx(const unsigned char *a, const unsigned char *b, int le
 	}
 }
 
-static inline size_t xnorx(const unsigned char *a, const unsigned char *b, int len) {
-	return !xorx(a,b,len);
+static inline size_t memneqx(const unsigned char *a, const unsigned char *b, int len) {
+	return !memeqx(a,b,len);
 }
 #endif
 
 static inline int
 linklocal(const unsigned char *address)
 {
-    return xnor8(address, llprefix);
+    return memneq8(address, llprefix);
 }
 
 static inline int
 v4mapped(const unsigned char *address)
 {
-    return xnor12(address, v4prefix);
+    return memneq12(address, v4prefix);
 }
 
 static inline int

@@ -1,12 +1,12 @@
 PREFIX = /usr/local
 MANDIR = $(PREFIX)/share/man
 
-CDEBUGFLAGS = -O2 -Wall # -g -pg
+CDEBUGFLAGS = -O3 -Wall # -g -pg
 
 DEFINES = $(PLATFORM_DEFINES)
 
 # you'll want to comment the ssee and HAVE_64BIT_ARCH out for other platforms
-CFLAGS = $(CDEBUGFLAGS) $(DEFINES) $(EXTRA_DEFINES) -msse4.2 -DHAVE_64BIT_ARCH
+CFLAGS = $(CDEBUGFLAGS) $(DEFINES) $(EXTRA_DEFINES) #  -msse4.2 -DHAVE_64BIT_ARCH
 
 LDLIBS = -lrt
 

@@ -30,11 +30,11 @@ struct resend {
     unsigned char kind;
     unsigned char max;
     unsigned short delay;
-    struct timeval time;
     unsigned char prefix[16];
     unsigned char src_prefix[16];
     unsigned char plen;
     unsigned char src_plen;
+    struct timeval time;
     unsigned short seqno;
     unsigned char id[8];
     struct interface *ifp;

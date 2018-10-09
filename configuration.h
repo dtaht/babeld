@@ -42,6 +42,7 @@ struct filter {
     char *ifname;
     unsigned char *id;
     unsigned char *prefix;
+    unsigned char *src_prefix;
     unsigned char plen;
     unsigned char plen_ge, plen_le;
     unsigned char src_plen;

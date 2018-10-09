@@ -171,7 +171,7 @@ check_interface_ipv4(struct interface *ifp)
         rc = 0;
 
     if(rc > 0) {
-        if(!ifp->ipv4 || xor4(ipv4, ifp->ipv4)) {
+        if(!ifp->ipv4 || memeq4(ipv4, ifp->ipv4)) {
             debugf("Noticed IPv4 change for %s.\n", ifp->name);
             flush_interface_routes(ifp, 0);
             if(!ifp->ipv4)
@@ -247,7 +247,7 @@ check_link_local_addresses(struct interface *ifp)
         if(rc == ifp->numll) {
             changed = 0;
             for(i = 0; i < rc; i++) {
-                if(xor16(ifp->ll[i], ll[i].prefix)) {
+                if(memeq16(ifp->ll[i], ll[i].prefix)) {
                     changed = 1;
                     break;
                 }
@@ -514,7 +514,7 @@ interface_ll_address(struct interface *ifp, const unsigned char *address)
         return 0;
 
     for(i = 0; i < ifp->numll; i++)
-        if(xnor16(ifp->ll[i], address))
+        if(memneq16(ifp->ll[i], address))
             return 1;
 
     return 0;
