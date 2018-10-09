@@ -333,7 +333,7 @@ netlink_read(struct netlink *nl, struct netlink *nl_ignore, int answer,
         iov.iov_len = sizeof(buf);
         len = recvmsg(nl->sock, &msg, 0);
 
-        if(len < 0 && (errno == EAGAIN || errno == EINTR)) {
+        if(len < 0 && (errno == EAGAIN || errno == EINTR || errno == ENOBUFS)) {
             int rc;
             rc = wait_for_fd(0, nl->sock, 100);
             if(rc <= 0) {
@@ -991,9 +991,7 @@ kernel_route(int operation, int table,
 {
     char buf[1024];
     if(operation == ROUTE_MODIFY && newmetric >= INFINITY)
-//      ((metric >= INFINITY && newmetric < INFINITY) ||
-//	(metric < INFINITY && newmetric >= INFINITY)))
-{
+    {
       kernel_route(ROUTE_FLUSH, table,
 		   dest, plen, src, src_plen,
 		   gate, ifindex, metric,
@@ -1008,7 +1006,11 @@ kernel_route(int operation, int table,
 			  gate, ifindex, metric,
 			  newgate, newifindex, newmetric, newtable);
     }
-
+    if(newmetric >= INFINITY && metric >= INFINITY) {
+	/* probably a bug in how I did the new add code, do nothing */
+	fprintf(stderr,"Dumb idea: Converting a route from infinity to infinity\n");
+	return 0;
+    }
     if(newmetric >= INFINITY) {
       switch(operation) {
       case ROUTE_MODIFY:
