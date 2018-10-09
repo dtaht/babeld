@@ -970,7 +970,17 @@ static int ipv6_metric = 1024;
 
 // Could it be something as stupid as newgate not working?
 // broken up from up top?
-// This 
+// This
+
+// If we've gone from unreach to reach we need to del add
+// If we've gone from reach to unreach we need to del add
+// But is this only with source specific?
+
+// Perhaps if we've switched both interface and nexthop also
+
+// a route_add does not actually use the newgate stuff. It should be
+// null!
+
 int
 kernel_route(int operation, int table,
              const unsigned char *dest, unsigned short plen,
@@ -980,41 +990,83 @@ kernel_route(int operation, int table,
              unsigned int newmetric, int newtable)
 {
     char buf[1024];
-    if(newmetric >= INFINITY) {
-      if(operation == ROUTE_MODIFY) {
+    if(operation == ROUTE_MODIFY &&
+       ((metric >= INFINITY && newmetric < INFINITY) ||
+	(metric < INFINITY && newmetric >= INFINITY))) {
+      kernel_route(ROUTE_FLUSH, table,
+		   dest, plen, src, src_plen,
+		   gate, ifindex, metric,
+		   newgate, newifindex,
+		   newmetric, newtable);
+
+      // this is why this is wrong because it's called elsewhere wrong
+      // we need to know the old metric to detect the transition
+      
+      return kernel_route(ROUTE_ADD, table,
+			  dest, plen, src, src_plen,
+			  newgate, newifindex, newmetric,
+			  NULL, metric, 0, 0);
+    }
+
+    if(metric >= INFINITY) {
+      switch(operation) {
+      case ROUTE_MODIFY:
     	sprintf(buf,"ip route %s unreachable %s from %s "
 		"table %d metric %d dev %s via %s proto 42\n",
 		operation == ROUTE_ADD ? "add" :
-		operation == ROUTE_FLUSH ? "flush" : 
+		operation == ROUTE_FLUSH ? "del" : 
 		operation == ROUTE_MODIFY ? "replace" : "???",
 		format_prefix(dest, plen), format_prefix(src, src_plen),
 		table, 0, "eno1" , format_address(newgate));
-      } else {
-    	sprintf(buf,"ip route %s unreachable %s from %s "
-		"table %d metric %d dev %s via %s proto 42\n",
+	break;
+      case ROUTE_FLUSH:
+    	sprintf(buf,"ip route %s %s from %s "
+		"table %d metric %d proto 42\n",
 		operation == ROUTE_ADD ? "add" :
-		operation == ROUTE_FLUSH ? "flush" : 
+		operation == ROUTE_FLUSH ? "del" : 
 		operation == ROUTE_MODIFY ? "replace" : "???",
 		format_prefix(dest, plen), format_prefix(src, src_plen),
-		table, 0, "eno1" , format_address(gate));
+		table, 0);
+	break;
+      case ROUTE_ADD:
+    	sprintf(buf,"ip route %s unreachable %s from %s "
+		"table %d metric %d proto 42\n",
+		operation == ROUTE_ADD ? "add" :
+		operation == ROUTE_FLUSH ? "del" : 
+		operation == ROUTE_MODIFY ? "replace" : "???",
+		format_prefix(dest, plen), format_prefix(src, src_plen),
+		table, 0);
+	break;
       }
     } else {
-      if(operation == ROUTE_MODIFY) {
+      switch(operation) {
+      case ROUTE_MODIFY: 
 	sprintf(buf,"ip route %s %s from %s "
 		"table %d metric %d dev %s via %s proto 42\n",
 		operation == ROUTE_ADD ? "add" :
-		operation == ROUTE_FLUSH ? "flush" : 
+		operation == ROUTE_FLUSH ? "del" : 
 		operation == ROUTE_MODIFY ? "replace" : "???",
 		format_prefix(dest, plen), format_prefix(src, src_plen),
 		newtable, 0, "eno1" , format_address(newgate));
-      } else {
+	break;
+      case ROUTE_FLUSH:
+	sprintf(buf,"ip route %s %s from %s "
+		"table %d metric %d dev %s proto 42\n",
+		operation == ROUTE_ADD ? "add" :
+		operation == ROUTE_FLUSH ? "del" : 
+		operation == ROUTE_MODIFY ? "replace" : "???",
+		format_prefix(dest, plen), format_prefix(src, src_plen),
+		table, 0, "eno1" );
+	break;
+      case ROUTE_ADD:
 	sprintf(buf,"ip route %s %s from %s "
 		"table %d metric %d dev %s via %s proto 42\n",
 		operation == ROUTE_ADD ? "add" :
-		operation == ROUTE_FLUSH ? "flush" : 
+		operation == ROUTE_FLUSH ? "del" : 
 		operation == ROUTE_MODIFY ? "replace" : "???",
 		format_prefix(dest, plen), format_prefix(src, src_plen),
 		table, 0, "eno1" , format_address(gate));
+	break;
       }
     }
     printf(buf);
