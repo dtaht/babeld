@@ -444,7 +444,7 @@ kernel_route(int operation, int table,
     }
 
     if(operation == ROUTE_MODIFY && newmetric == metric &&
-       xnor16(newgate, gate) && newifindex == ifindex)
+       memneq16(newgate, gate) && newifindex == ifindex)
         return 0;
 
 

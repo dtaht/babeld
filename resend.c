@@ -42,9 +42,9 @@ resend_match(struct resend *resend,
              const unsigned char *src_prefix, unsigned char src_plen)
 {
     return (resend->kind == kind &&
-            resend->plen == plen && xnor16(resend->prefix, prefix) &&
+            resend->plen == plen && memneq16(resend->prefix, prefix) &&
             resend->src_plen == src_plen &&
-            xnor16(resend->src_prefix, src_prefix));
+            memneq16(resend->src_prefix, src_prefix));
 }
 
 /* This is called by neigh.c when a neighbour is flushed */
@@ -115,7 +115,7 @@ record_resend(int kind, const unsigned char *prefix, unsigned char plen,
             resend->delay = delay;
         resend->time = now;
         resend->max = RESEND_MAX;
-        if(id && xnor8(resend->id, id) &&
+        if(id && memneq8(resend->id, id) &&
            seqno_compare(resend->seqno, seqno) > 0) {
             return 0;
         }
@@ -176,7 +176,7 @@ unsatisfied_request(const unsigned char *prefix, unsigned char plen,
     if(request == NULL || resend_expired(request))
         return 0;
 
-    if(xor8(request->id, id) ||
+    if(memeq8(request->id, id) ||
        seqno_compare(request->seqno, seqno) <= 0)
         return 1;
 
@@ -196,7 +196,7 @@ request_redundant(struct interface *ifp,
     if(request == NULL || resend_expired(request))
         return 0;
 
-    if(xnor8(request->id, id) &&
+    if(memneq8(request->id, id) &&
        seqno_compare(request->seqno, seqno) > 0)
         return 0;
 
@@ -230,7 +230,7 @@ satisfy_request(const unsigned char *prefix, unsigned char plen,
     if(ifp != NULL && request->ifp != ifp)
         return 0;
 
-    if(xor8(request->id, id) ||
+    if(memeq8(request->id, id) ||
        seqno_compare(request->seqno, seqno) <= 0) {
         /* We cannot remove the request, as we may be walking the list right
            now.  Mark it as expired, so that expire_resend will remove it. */
