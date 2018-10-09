@@ -67,6 +67,7 @@ struct kernel_filter {
 #define ROUTE_FLUSH 0
 #define ROUTE_ADD 1
 #define ROUTE_MODIFY 2
+#define ROUTE_ADD_HARDER 3
 
 #define CHANGE_LINK  (1 << 0)
 #define CHANGE_ROUTE (1 << 1)
