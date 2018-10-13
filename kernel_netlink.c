@@ -990,6 +990,7 @@ kernel_route(int operation, int table,
              unsigned int newmetric, int newtable)
 {
     char buf[1024];
+    char ifname[32];
     if(operation == ROUTE_MODIFY && newmetric >= INFINITY)
     {
       kernel_route(ROUTE_FLUSH, table,
@@ -1018,7 +1019,7 @@ kernel_route(int operation, int table,
 		"table %d metric %d proto 42\n",
 		format_prefix(dest, plen), format_prefix(src, src_plen),
 		table, 0);
-	//, "eno1" , format_address(newgate));
+	//, if_indextoname(ifindex,ifname) , format_address(newgate));
 	break;
       case ROUTE_FLUSH:
 	if(metric >= INFINITY)
@@ -1030,7 +1031,7 @@ kernel_route(int operation, int table,
 	sprintf(buf,"ip route del %s from %s "
 		"table %d metric %d dev %s via %s proto 42\n",
 		format_prefix(dest, plen), format_prefix(src, src_plen),
-		table, 0, "eno1", format_address(gate) );
+		table, 0, if_indextoname(ifindex,ifname), format_address(gate) );
 	break;
       case ROUTE_ADD:
     	sprintf(buf,"ip route add unreachable %s from %s "
@@ -1045,7 +1046,7 @@ kernel_route(int operation, int table,
 	sprintf(buf,"ip route replace %s from %s "
 		"table %d metric %d dev %s via %s proto 42\n",
 		format_prefix(dest, plen), format_prefix(src, src_plen),
-		newtable, 0, "eno1" , format_address(newgate));
+		newtable, 0, if_indextoname(ifindex,ifname) , format_address(newgate));
 	break;
       case ROUTE_FLUSH:
 	if(metric >= INFINITY)
@@ -1057,13 +1058,13 @@ kernel_route(int operation, int table,
 	sprintf(buf,"ip route del %s from %s "
 		"table %d metric %d dev %s via %s proto 42\n",
 		format_prefix(dest, plen), format_prefix(src, src_plen),
-		table, 0, "eno1", format_address(gate) );
+		table, 0, if_indextoname(ifindex,ifname), format_address(gate) );
 	break;
       case ROUTE_ADD:
 	sprintf(buf,"ip route add %s from %s "
 		"table %d metric %d dev %s via %s proto 42\n",
 		format_prefix(dest, plen), format_prefix(src, src_plen),
-		newtable, 0, "eno1" , format_address(newgate));
+		newtable, 0, if_indextoname(ifindex,ifname) , format_address(newgate));
 	break;
       }
     }
@@ -1084,8 +1085,27 @@ kernel_route2(int operation, int table,
     struct rtattr *rta;
     int len = sizeof(buf.raw);
     int rc, ipv4, use_src = 0;
-    unsigned char * origgate = gate;
-    // iffindex can be zero!?
+
+    if(operation == ROUTE_MODIFY)
+      {
+	if(newmetric == metric && xnor16(newgate, gate) &&
+           newifindex == ifindex && table == newtable)
+            return 0;
+
+	if(newmetric >= INFINITY)
+	  {
+	    kernel_route(ROUTE_FLUSH, table,
+			 dest, plen, src, src_plen,
+			 gate, ifindex, metric,
+			 newgate, newifindex,
+			 newmetric, newtable);
+	    
+	    return kernel_route(ROUTE_ADD, table,
+				dest, plen, src, src_plen,
+				gate, ifindex, metric,
+				newgate, newifindex, newmetric, newtable);
+	  }
+      }
     
     if(!nl_setup) {
         fprintf(stderr,"kernel_route: netlink not initialized.\n");
@@ -1104,38 +1124,23 @@ kernel_route2(int operation, int table,
             return -1;
         }
     }
-
+    // newgate vs gate - otherwise we're gonna hit null
+    
     /* Check that the protocol family is consistent. */
     if(plen >= 96 && v4mapped(dest)) {
-        if(!v4mapped(gate) ||
+        if(!v4mapped(newgate) ||
            !v4mapped(src)) {
             errno = EINVAL;
             return -1;
         }
     } else {
-        if(v4mapped(gate) || v4mapped(src)) {
+        if(v4mapped(newgate) || v4mapped(src)) {
             errno = EINVAL;
             return -1;
         }
     }
 
-    if(operation == ROUTE_MODIFY) {
-	if(newmetric == metric && xnor16(newgate, gate) &&
-           newifindex == ifindex && table == newtable)
-            return 0;
-
-	/* We can't do a clean modify unless we are only
-	   changing *one* variable. Usually we are moving
-	   a route from unreach to reach though. */
-
-	metric = newmetric;
-	gate = newgate;
-	ifindex = newifindex;
-	table = newtable;
-    }
-
-
-    ipv4 = v4mapped(gate);
+    ipv4 = v4mapped(newgate);
     use_src = (!is_default(src, src_plen) && kernel_disambiguate(ipv4));
 
     kdebugf("kernel_route: %s %s from %s "
@@ -1154,11 +1159,7 @@ kernel_route2(int operation, int table,
     memset(buf.raw, 0, sizeof(buf.raw));
     switch(operation) {
     	case ROUTE_MODIFY: 
-        buf.nh.nlmsg_flags = NLM_F_REQUEST | NLM_F_CREATE | NLM_F_REPLACE ;
-        buf.nh.nlmsg_type = RTM_NEWROUTE;
-	break;
-    	case ROUTE_ADD_HARDER: 
-        buf.nh.nlmsg_flags = NLM_F_REQUEST | NLM_F_REPLACE;
+        buf.nh.nlmsg_flags = NLM_F_REQUEST | NLM_F_EXCL | NLM_F_REPLACE ;
         buf.nh.nlmsg_type = RTM_NEWROUTE;
 	break;
     	case ROUTE_ADD: 
@@ -1177,9 +1178,8 @@ kernel_route2(int operation, int table,
     rtm->rtm_dst_len = ipv4 ? plen - 96 : plen;
     if(use_src)
         rtm->rtm_src_len = src_plen;
-    rtm->rtm_table = table;
     rtm->rtm_scope = RT_SCOPE_UNIVERSE;
-    if(metric < KERNEL_INFINITY) {
+    if(newmetric < INFINITY) {
         rtm->rtm_type = RTN_UNICAST;
         rtm->rtm_flags |= RTNH_F_ONLINK;
     } else
@@ -1188,6 +1188,60 @@ kernel_route2(int operation, int table,
     rtm->rtm_protocol = RTPROT_BABEL;
 
     rta = RTM_RTA(rtm);
+
+    // maybe this is ipv4 or ipv6 only
+    // I had hard coded the gw always
+    // table vs newtable, gate vs newgate, ifindex
+    
+    if(newmetric >= INFINITY) {
+	if(metric < INFINITY && operation == ROUTE_FLUSH) {
+	if(operation == ROUTE_FLUSH) {
+	  newgate = gate;
+	  newtable = table;
+	  newifindex = ifindex;
+	}
+	rtm->rtm_table = newtable;
+	rta = RTA_NEXT(rta, len);
+        rta->rta_len = RTA_LENGTH(sizeof(int));
+        rta->rta_type = RTA_OIF;
+        *(int*)RTA_DATA(rta) = newifindex;
+        if(ipv4) {
+            rta = RTA_NEXT(rta, len);
+            rta->rta_len = RTA_LENGTH(sizeof(struct in_addr));
+            rta->rta_type = RTA_GATEWAY;
+            memcpy(RTA_DATA(rta), newgate + 12, sizeof(struct in_addr));
+        } else {
+            rta = RTA_NEXT(rta, len);
+            rta->rta_len = RTA_LENGTH(sizeof(struct in6_addr));
+            rta->rta_type = RTA_GATEWAY;
+            memcpy(RTA_DATA(rta), newgate, sizeof(struct in6_addr));
+        }
+	}
+    } else {
+      if(metric < INFINITY) {
+	if(operation == ROUTE_FLUSH || operation == ROUTE_MODIFY) {
+	  newgate = gate;
+	  newtable = table; // wrong
+	  newifindex = ifindex;
+	}
+	rtm->rtm_table = newtable;
+        rta = RTA_NEXT(rta, len);
+        rta->rta_len = RTA_LENGTH(sizeof(int));
+        rta->rta_type = RTA_OIF;
+        *(int*)RTA_DATA(rta) = newifindex;
+        if(ipv4) {
+            rta = RTA_NEXT(rta, len);
+            rta->rta_len = RTA_LENGTH(sizeof(struct in_addr));
+            rta->rta_type = RTA_GATEWAY;
+            memcpy(RTA_DATA(rta), newgate + 12, sizeof(struct in_addr));
+        } else {
+            rta = RTA_NEXT(rta, len);
+            rta->rta_len = RTA_LENGTH(sizeof(struct in6_addr));
+            rta->rta_type = RTA_GATEWAY;
+            memcpy(RTA_DATA(rta), newgate, sizeof(struct in6_addr));
+        }
+      }
+    }
 
     if(ipv4) {
         rta = RTA_NEXT(rta, len);
@@ -1207,27 +1261,7 @@ kernel_route2(int operation, int table,
         }
     }
 
-    // maybe this is ipv4 or ipv6 only
     
-    if(metric < KERNEL_INFINITY) {
-    rta = RTA_NEXT(rta, len);
-
-        rta->rta_len = RTA_LENGTH(sizeof(int));
-        rta->rta_type = RTA_OIF;
-        *(int*)RTA_DATA(rta) = ifindex;
-    
-        if(ipv4) {
-            rta = RTA_NEXT(rta, len);
-            rta->rta_len = RTA_LENGTH(sizeof(struct in_addr));
-            rta->rta_type = RTA_GATEWAY;
-            memcpy(RTA_DATA(rta), gate + 12, sizeof(struct in_addr));
-        } else {
-            rta = RTA_NEXT(rta, len);
-            rta->rta_len = RTA_LENGTH(sizeof(struct in6_addr));
-            rta->rta_type = RTA_GATEWAY;
-            memcpy(RTA_DATA(rta), gate, sizeof(struct in6_addr));
-        }
-    }
     rta = RTA_NEXT(rta, len);
     rta->rta_len = RTA_LENGTH(sizeof(int));
     rta->rta_type = RTA_PRIORITY; // is this really metric?
@@ -1237,29 +1271,15 @@ kernel_route2(int operation, int table,
 
     rc = netlink_talk(&buf.nh);
     if (rc < 0) {
-    printf("route failure: %s %s from %s "
+      printf("route failure: %s %s from %s "
             "table %d metric %d dev %d nexthop %s\n",
             operation == ROUTE_ADD ? "add" :
             operation == ROUTE_FLUSH ? "flush" : 
             operation == ROUTE_MODIFY ? "modify" : "???",
             format_prefix(dest, plen), format_prefix(src, src_plen),
             table, metric, ifindex, format_address(gate));
-
-	if(errno == EEXIST && operation == ROUTE_ADD) 
-		return(kernel_route(ROUTE_ADD_HARDER, table, dest, plen,
-                         src, src_plen,
-				    gate, ifindex, metric,
-                         newgate, newifindex, newmetric, newtable));
-
-	/*	if(operation == ROUTE_MODIFY) {
-	printf("Modify failed, trying add\n");
-	return(kernel_route(ROUTE_ADD, 22, dest, plen,
-                         src, src_plen,
-                         origgate, newifindex, newmetric,
-                         newgate, newifindex, newmetric, newtable));
-			 } */
 	}
-    if (errno == EEXIST && operation == ROUTE_MODIFY ) rc = 0;
+    //    if (errno == EEXIST && operation == ROUTE_MODIFY ) rc = 0;
     return rc;
 }
 
