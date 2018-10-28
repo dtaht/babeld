@@ -1172,6 +1172,9 @@ really_send_update(struct interface *ifp, const unsigned char *id,
                    unsigned short seqno, unsigned short metric,
                    unsigned char *channels, int channels_len)
 {
+    if(!if_up(ifp))
+        return;
+
     if((ifp->flags & IF_UNICAST) != 0) {
         struct neighbour *neigh;
         FOR_ALL_NEIGHBOURS(neigh) {
@@ -1791,6 +1794,9 @@ send_multihop_request(struct buffered *buf,
 {
     int v4, pb, spb, len;
     int is_ss = !is_default(src_prefix, src_plen);
+
+    if(!if_up(ifp))
+        return;
 
     if(is_ss && buf->rfc6126_compatible)
         return;
