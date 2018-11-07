@@ -1172,6 +1172,9 @@ really_send_update(struct interface *ifp, const unsigned char *id,
                    unsigned short seqno, unsigned short metric,
                    unsigned char *channels, int channels_len)
 {
+    if(!if_up(ifp))
+        return;
+
     if((ifp->flags & IF_UNICAST) != 0) {
         struct neighbour *neigh;
         FOR_ALL_NEIGHBOURS(neigh) {
@@ -1900,9 +1903,11 @@ send_request_resend(const unsigned char *prefix, unsigned char plen,
                       id, neigh->ifp, resend_delay);
     } else {
         struct interface *ifp;
-        FOR_ALL_INTERFACES(ifp)
+        FOR_ALL_INTERFACES(ifp) {
+	    if(!if_up(ifp)) continue;
             send_multihop_request(&ifp->buf, prefix, plen, src_prefix, src_plen,
                                   seqno, id, 127);
+	}
     }
 }
 
