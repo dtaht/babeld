@@ -20,32 +20,33 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#include "uthash.h"
+
 #define REQUEST_TIMEOUT 65000
 #define RESEND_MAX 3
 
 #define RESEND_REQUEST 1
-#define RESEND_UPDATE 2
+#define RESEND_UPDATE 0
 
 struct resend {
-    unsigned char kind;
-    unsigned char max;
-    unsigned short delay;
-    struct timeval time;
-    unsigned char prefix[16];
     unsigned char plen;
-    unsigned char src_prefix[16];
+    unsigned char prefix[16];
     unsigned char src_plen;
+    unsigned char src_prefix[16];
+    unsigned char kind;
+    unsigned char delay;
+    unsigned short max;
     unsigned short seqno;
+    struct timeval time;
     unsigned char id[8];
     struct interface *ifp;
-    struct resend *next;
+    UT_hash_handle hh;
 };
 
-extern struct timeval resend_time;
+extern struct timeval resend_time[2];
 
 struct resend *find_request(const unsigned char *prefix, unsigned char plen,
-                    const unsigned char *src_prefix, unsigned char src_plen,
-                    struct resend **previous_return);
+                    const unsigned char *src_prefix, unsigned char src_plen);
 void flush_resends(struct neighbour *neigh);
 int record_resend(int kind, const unsigned char *prefix, unsigned char plen,
                   const unsigned char *src_prefix, unsigned char src_plen,
@@ -64,5 +65,5 @@ int satisfy_request(const unsigned char *prefix, unsigned char plen,
                     struct interface *ifp);
 
 void expire_resend(void);
-void recompute_resend_time(void);
-void do_resend(void);
+void recompute_resend_time(int kind);
+void do_resend(int kind);
