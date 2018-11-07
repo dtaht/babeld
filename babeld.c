@@ -601,7 +601,8 @@ main(int argc, char **argv)
         timeval_min_sec(&tv, expiry_time);
         timeval_min_sec(&tv, source_expiry_time);
         timeval_min_sec(&tv, kernel_dump_time);
-        timeval_min(&tv, &resend_time);
+        timeval_min(&tv, &resend_time[0]);
+        timeval_min(&tv, &resend_time[1]);
         FOR_ALL_INTERFACES(ifp) {
             if(!if_up(ifp))
                 continue;
@@ -769,10 +770,11 @@ main(int argc, char **argv)
                 flushupdates(ifp);
         }
 
-        if(resend_time.tv_sec != 0) {
-            if(timeval_compare(&now, &resend_time) >= 0)
-                do_resend();
-        }
+	for(int i = 0; i < 2; i++) {
+	    if(resend_time[i].tv_sec != 0 &&
+	       timeval_compare(&now, &resend_time[i]) >= 0)
+                 do_resend(i);
+	}
 
         FOR_ALL_INTERFACES(ifp) {
             if(!if_up(ifp))

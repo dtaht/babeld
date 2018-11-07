@@ -20,13 +20,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#include <stdio.h>
 #include <sys/time.h>
 #include <time.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-
 #include "babeld.h"
 #include "util.h"
 #include "interface.h"
@@ -34,20 +34,17 @@ THE SOFTWARE.
 #include "resend.h"
 #include "message.h"
 #include "configuration.h"
+#include "uthash.h"
 
-struct timeval resend_time = {0, 0};
-struct resend *to_resend = NULL;
+struct timeval resend_time[2] = {};
+struct resend *to_resend[2] = {};
 
-static int
-resend_match(struct resend *resend,
-             int kind, const unsigned char *prefix, unsigned char plen,
-             const unsigned char *src_prefix, unsigned char src_plen)
-{
-    return (resend->kind == kind &&
-            resend->plen == plen && memcmp(resend->prefix, prefix, 16) == 0 &&
-            resend->src_plen == src_plen &&
-            memcmp(resend->src_prefix, src_prefix, 16) == 0);
-}
+struct resend dummy;
+
+static const int keylen =  offsetof(struct resend, src_prefix)
+             /* last key field offset */
+             + sizeof(dummy.src_prefix)             /* size of last key field */
+             - offsetof(struct resend,plen);  /* offset of first key field */
 
 /* This is called by neigh.c when a neighbour is flushed */
 
@@ -59,33 +56,33 @@ flush_resends(struct neighbour *neigh)
 
 static struct resend *
 find_resend(int kind, const unsigned char *prefix, unsigned char plen,
-            const unsigned char *src_prefix, unsigned char src_plen,
-            struct resend **previous_return)
+            const unsigned char *src_prefix, unsigned char src_plen)
 {
-    struct resend *current, *previous;
+    struct resend *result;
+    struct resend r;
+    /* Not having datum support complicates this */
+    r.kind = kind;
+    r.plen = plen;
+    r.src_plen = src_plen;
+    if(prefix == NULL)
+        memset(&r.prefix, 0, 16);
+    else
+        memcpy(&r.prefix, prefix, 16);
 
-    previous = NULL;
-    current = to_resend;
-    while(current) {
-        if(resend_match(current, kind, prefix, plen, src_prefix, src_plen)) {
-            if(previous_return)
-                *previous_return = previous;
-            return current;
-        }
-        previous = current;
-        current = current->next;
-    }
+    if(src_prefix == NULL)
+        memset(&r.src_prefix, 0, 16);
+    else
+        memcpy(&r.src_prefix, src_prefix, 16);
 
-    return NULL;
+    HASH_FIND( hh, to_resend[kind], &r.plen, keylen, result);
+    return result;
 }
 
 struct resend *
 find_request(const unsigned char *prefix, unsigned char plen,
-             const unsigned char *src_prefix, unsigned char src_plen,
-             struct resend **previous_return)
+             const unsigned char *src_prefix, unsigned char src_plen)
 {
-    return find_resend(RESEND_REQUEST, prefix, plen, src_prefix, src_plen,
-                       previous_return);
+    return find_resend(RESEND_REQUEST, prefix, plen, src_prefix, src_plen);
 }
 
 int
@@ -109,7 +106,7 @@ record_resend(int kind, const unsigned char *prefix, unsigned char plen,
     if(delay >= 0xFFFF)
         delay = 0xFFFF;
 
-    resend = find_resend(kind, prefix, plen, src_prefix, src_plen, NULL);
+    resend = find_resend(kind, prefix, plen, src_prefix, src_plen);
     if(resend) {
         if(resend->delay && delay)
             resend->delay = MIN(resend->delay, delay);
@@ -144,14 +141,13 @@ record_resend(int kind, const unsigned char *prefix, unsigned char plen,
             memcpy(resend->id, id, 8);
         resend->ifp = ifp;
         resend->time = now;
-        resend->next = to_resend;
-        to_resend = resend;
+        HASH_ADD(hh, to_resend[kind], plen, keylen, resend);
     }
 
     if(resend->delay) {
         struct timeval timeout;
         timeval_add_msec(&timeout, &resend->time, resend->delay);
-        timeval_min(&resend_time, &timeout);
+        timeval_min(&resend_time[kind], &timeout);
     }
     return 1;
 }
@@ -174,7 +170,7 @@ unsatisfied_request(const unsigned char *prefix, unsigned char plen,
 {
     struct resend *request;
 
-    request = find_request(prefix, plen, src_prefix, src_plen, NULL);
+    request = find_request(prefix, plen, src_prefix, src_plen);
     if(request == NULL || resend_expired(request))
         return 0;
 
@@ -194,7 +190,7 @@ request_redundant(struct interface *ifp,
 {
     struct resend *request;
 
-    request = find_request(prefix, plen, src_prefix, src_plen, NULL);
+    request = find_request(prefix, plen, src_prefix, src_plen);
     if(request == NULL || resend_expired(request))
         return 0;
 
@@ -223,9 +219,7 @@ satisfy_request(const unsigned char *prefix, unsigned char plen,
                 unsigned short seqno, const unsigned char *id,
                 struct interface *ifp)
 {
-    struct resend *request, *previous;
-
-    request = find_request(prefix, plen, src_prefix, src_plen, &previous);
+    struct resend *request = find_request(prefix, plen, src_prefix, src_plen);
     if(request == NULL)
         return 0;
 
@@ -238,7 +232,7 @@ satisfy_request(const unsigned char *prefix, unsigned char plen,
            now.  Mark it as expired, so that expire_resend will remove it. */
         request->max = 0;
         request->time.tv_sec = 0;
-        recompute_resend_time();
+        recompute_resend_time(request->kind); // ouch!!!!
         return 1;
     }
 
@@ -248,58 +242,46 @@ satisfy_request(const unsigned char *prefix, unsigned char plen,
 void
 expire_resend()
 {
-    struct resend *current, *previous;
+    int recompute = 0;
+    struct resend *request, *tmp;
+    for(int i = 0; i < 2; i++) {
+    HASH_ITER(hh, to_resend[i], request, tmp) {
+        if(resend_expired(request)) {
+		HASH_DEL(to_resend[i], request);
+		free (request);
+             	recompute++;
+             }
+       }
+    if(recompute) {
+	fprintf(stderr,"Bulk Expired %d routes\n", recompute);
+	recompute_resend_time(i);
+	}
+    }
+}
+
+void
+recompute_resend_time(int kind)
+{
+    struct timeval resend = {0, 0};
+    struct resend *request, *tmp;
+
+    HASH_ITER(hh, to_resend[kind], request, tmp) {
+       if(!resend_expired(request) && request->delay > 0 && request->max > 0) {
+          struct timeval timeout;
+          timeval_add_msec(&timeout, &request->time, request->delay);
+          timeval_min(&resend, &timeout);
+      }
+    }
+    resend_time[kind] = resend;
+}
+
+void
+do_resend(int kind)
+{
+    struct resend *resend, *tmp;
     int recompute = 0;
 
-    previous = NULL;
-    current = to_resend;
-    while(current) {
-        if(resend_expired(current)) {
-            if(previous == NULL) {
-                to_resend = current->next;
-                free(current);
-                current = to_resend;
-            } else {
-                previous->next = current->next;
-                free(current);
-                current = previous->next;
-            }
-            recompute = 1;
-        } else {
-            previous = current;
-            current = current->next;
-        }
-    }
-    if(recompute)
-        recompute_resend_time();
-}
-
-void
-recompute_resend_time()
-{
-    struct resend *request;
-    struct timeval resend = {0, 0};
-
-    request = to_resend;
-    while(request) {
-        if(!resend_expired(request) && request->delay > 0 && request->max > 0) {
-            struct timeval timeout;
-            timeval_add_msec(&timeout, &request->time, request->delay);
-            timeval_min(&resend, &timeout);
-        }
-        request = request->next;
-    }
-
-    resend_time = resend;
-}
-
-void
-do_resend()
-{
-    struct resend *resend;
-
-    resend = to_resend;
-    while(resend) {
+    HASH_ITER(hh, to_resend[kind], resend, tmp) {
         if(!resend_expired(resend) && resend->delay > 0 && resend->max > 0) {
             struct timeval timeout;
             timeval_add_msec(&timeout, &resend->time, resend->delay);
@@ -323,8 +305,16 @@ do_resend()
                 resend->delay = MIN(0xFFFF, resend->delay * 2);
                 resend->max--;
             }
+	}
+        if(resend_expired(resend)) {
+	    HASH_DEL(to_resend[kind], resend);
+	    free (resend);
+	    recompute++;
         }
-        resend = resend->next;
     }
-    recompute_resend_time();
+
+    if(recompute) {
+        fprintf(stderr,"Expired %d routes during do_resend\n", recompute);
+    }
+    recompute_resend_time(kind);
 }
