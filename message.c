@@ -1564,7 +1564,7 @@ update_myseqno()
 void
 send_self_update(struct interface *ifp)
 {
-    struct xroute_stream *xroutes;
+  struct xroute *xroute, *tmp;
     if(ifp == NULL) {
         struct interface *ifp_aux;
         FOR_ALL_INTERFACES(ifp_aux) {
@@ -1576,17 +1576,9 @@ send_self_update(struct interface *ifp)
     }
 
     debugf("Sending self update to %s.\n", ifp->name);
-    xroutes = xroute_stream();
-    if(xroutes) {
-        while(1) {
-            struct xroute *xroute = xroute_stream_next(xroutes);
-            if(xroute == NULL) break;
+    HASH_ITER(hh, xroutes, xroute, tmp) {
             send_update(ifp, 0, xroute->prefix, xroute->plen,
                         xroute->src_prefix, xroute->src_plen);
-        }
-        xroute_stream_done(xroutes);
-    } else {
-        fprintf(stderr, "Couldn't allocate xroute stream.\n");
     }
 }
 

@@ -39,7 +39,7 @@ THE SOFTWARE.
 struct timeval resend_time[2] = {};
 struct resend *to_resend[2] = {};
 
-struct resend dummy;
+static struct resend dummy;
 
 static const int keylen =  offsetof(struct resend, src_prefix)
              /* last key field offset */
@@ -315,6 +315,7 @@ do_resend(int kind)
 
     if(recompute) {
         fprintf(stderr,"Expired %d routes during do_resend\n", recompute);
+	if(recompute > 50) gettime(&now); /* walking the list takes time */
     }
     recompute_resend_time(kind);
 }

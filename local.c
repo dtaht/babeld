@@ -278,7 +278,7 @@ local_notify_all_1(struct local_socket *s)
 {
     struct interface *ifp;
     struct neighbour *neigh;
-    struct xroute_stream *xroutes;
+    struct xroute *xroute, *tmp;
     struct route_stream *routes;
 
     FOR_ALL_INTERFACES(ifp) {
@@ -289,15 +289,8 @@ local_notify_all_1(struct local_socket *s)
         local_notify_neighbour_1(s, neigh, LOCAL_ADD);
     }
 
-    xroutes = xroute_stream();
-    if(xroutes) {
-        while(1) {
-            struct xroute *xroute = xroute_stream_next(xroutes);
-            if(xroute == NULL)
-                break;
+    HASH_ITER(hh, xroutes, xroute, tmp) {
             local_notify_xroute_1(s, xroute, LOCAL_ADD);
-        }
-        xroute_stream_done(xroutes);
     }
 
     routes = route_stream(ROUTE_ALL);

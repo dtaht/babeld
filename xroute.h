@@ -20,17 +20,20 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#include "uthash.h"
+
 struct xroute {
-    unsigned char prefix[16];
     unsigned char plen;
-    unsigned char src_prefix[16];
+    unsigned char prefix[16];
     unsigned char src_plen;
+    unsigned char src_prefix[16];
     unsigned short metric;
     unsigned int ifindex;
     int proto;
+    UT_hash_handle hh;
 };
 
-struct xroute_stream;
+extern struct xroute *xroutes;
 
 struct xroute *find_xroute(const unsigned char *prefix, unsigned char plen,
                 const unsigned char *src_prefix, unsigned char src_plen);
@@ -39,9 +42,6 @@ int add_xroute(unsigned char prefix[16], unsigned char plen,
                unsigned char src_prefix[16], unsigned char src_plen,
                unsigned short metric, unsigned int ifindex, int proto);
 int xroutes_estimate(void);
-struct xroute_stream *xroute_stream();
-struct xroute *xroute_stream_next(struct xroute_stream *stream);
-void xroute_stream_done(struct xroute_stream *stream);
 int kernel_addresses(int ifindex, int ll,
                      struct kernel_route *routes, int maxroutes);
 int check_xroutes(int send_updates);

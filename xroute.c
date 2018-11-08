@@ -39,52 +39,44 @@ THE SOFTWARE.
 #include "configuration.h"
 #include "local.h"
 
-static struct xroute *xroutes;
-static int numxroutes = 0, maxxroutes = 0;
+struct xroute *xroutes;
+static int numxroutes = 0;
+static struct xroute dummy;
+
+static const int keylen =  offsetof(struct xroute, src_prefix)
+             /* last key field offset */
+             + sizeof(dummy.src_prefix)      /* size of last key field */
+             - offsetof(struct xroute,plen); /* offset of first key field */
 
 struct xroute *
 find_xroute(const unsigned char *prefix, unsigned char plen,
             const unsigned char *src_prefix, unsigned char src_plen)
 {
-    int i;
-    for(i = 0; i < numxroutes; i++) {
-        if(xroutes[i].plen == plen &&
-           memcmp(xroutes[i].prefix, prefix, 16) == 0 &&
-           xroutes[i].src_plen == src_plen &&
-           memcmp(xroutes[i].src_prefix, src_prefix, 16) == 0)
-            return &xroutes[i];
-    }
-    return NULL;
+    struct xroute *result;
+    struct xroute r;
+    /* Not having datum support complicates this */
+    r.plen = plen;
+    r.src_plen = src_plen;
+    if(prefix == NULL)
+        memset(&r.prefix, 0, 16);
+    else
+        memcpy(&r.prefix, prefix, 16);
+
+    if(src_prefix == NULL)
+        memset(&r.src_prefix, 0, 16);
+    else
+        memcpy(&r.src_prefix, src_prefix, 16);
+
+    HASH_FIND( hh, xroutes, &r.plen, keylen, result);
+    return result;
 }
 
 void
 flush_xroute(struct xroute *xroute)
 {
-    int i;
-
-    i = xroute - xroutes;
-    assert(i >= 0 && i < numxroutes);
-
     local_notify_xroute(xroute, LOCAL_FLUSH);
-
-    if(i != numxroutes - 1)
-        memcpy(xroutes + i, xroutes + numxroutes - 1, sizeof(struct xroute));
+    HASH_DEL(xroutes, xroute);
     numxroutes--;
-    VALGRIND_MAKE_MEM_UNDEFINED(xroutes + numxroutes, sizeof(struct xroute));
-
-    if(numxroutes == 0) {
-        free(xroutes);
-        xroutes = NULL;
-        maxxroutes = 0;
-    } else if(maxxroutes > 8 && numxroutes < maxxroutes / 4) {
-        struct xroute *new_xroutes;
-        int n = maxxroutes / 2;
-        new_xroutes = realloc(xroutes, n * sizeof(struct xroute));
-        if(new_xroutes == NULL)
-            return;
-        xroutes = new_xroutes;
-        maxxroutes = n;
-    }
 }
 
 int
@@ -92,6 +84,7 @@ add_xroute(unsigned char prefix[16], unsigned char plen,
            unsigned char src_prefix[16], unsigned char src_plen,
            unsigned short metric, unsigned int ifindex, int proto)
 {
+    struct xroute *r;
     struct xroute *xroute = find_xroute(prefix, plen, src_prefix, src_plen);
     if(xroute) {
         if(xroute->metric <= metric)
@@ -101,25 +94,19 @@ add_xroute(unsigned char prefix[16], unsigned char plen,
         return 1;
     }
 
-    if(numxroutes >= maxxroutes) {
-        struct xroute *new_xroutes;
-        int n = maxxroutes < 1 ? 8 : 2 * maxxroutes;
-        new_xroutes = realloc(xroutes, n * sizeof(struct xroute));
-        if(new_xroutes == NULL)
-            return -1;
-        maxxroutes = n;
-        xroutes = new_xroutes;
-    }
-
-    memcpy(xroutes[numxroutes].prefix, prefix, 16);
-    xroutes[numxroutes].plen = plen;
-    memcpy(xroutes[numxroutes].src_prefix, src_prefix, 16);
-    xroutes[numxroutes].src_plen = src_plen;
-    xroutes[numxroutes].metric = metric;
-    xroutes[numxroutes].ifindex = ifindex;
-    xroutes[numxroutes].proto = proto;
+    r = calloc(1,sizeof(struct xroute));
+    if(!r) return 0;
+   
+    memcpy(&r->prefix, prefix, 16);
+    r->plen = plen;
+    memcpy(&r->src_prefix, src_prefix, 16);
+    r->src_plen = src_plen;
+    r->metric = metric;
+    r->ifindex = ifindex;
+    r->proto = proto;
+    HASH_ADD(hh, xroutes, plen, keylen, r);
     numxroutes++;
-    local_notify_xroute(&xroutes[numxroutes - 1], LOCAL_ADD);
+    local_notify_xroute(r, LOCAL_ADD);
     return 1;
 }
 
@@ -128,37 +115,6 @@ int
 xroutes_estimate()
 {
     return numxroutes;
-}
-
-struct xroute_stream {
-    int index;
-};
-
-struct
-xroute_stream *
-xroute_stream()
-{
-    struct xroute_stream *stream = calloc(1, sizeof(struct xroute_stream));
-    if(stream == NULL)
-        return NULL;
-
-    return stream;
-}
-
-
-struct xroute *
-xroute_stream_next(struct xroute_stream *stream)
-{
-    if(stream->index < numxroutes)
-        return &xroutes[stream->index++];
-    else
-        return NULL;
-}
-
-void
-xroute_stream_done(struct xroute_stream *stream)
-{
-    free(stream);
 }
 
 static int
@@ -251,6 +207,7 @@ check_xroutes(int send_updates)
     struct kernel_route *routes;
     struct filter_result filter_result;
     int numroutes, numaddresses;
+    struct xroute *xroute, *tmp;
     static int maxroutes = 8;
     const int maxmaxroutes = 256 * 1024;
 
@@ -299,19 +256,20 @@ check_xroutes(int send_updates)
 
     /* Check for any routes that need to be flushed */
 
-    i = 0;
-    while(i < numxroutes) {
+    HASH_ITER(hh, xroutes, xroute, tmp) {
         export = 0;
-        metric = redistribute_filter(xroutes[i].prefix, xroutes[i].plen,
-                                     xroutes[i].src_prefix, xroutes[i].src_plen,
-                                     xroutes[i].ifindex, xroutes[i].proto,
+        metric = redistribute_filter(xroute->prefix, xroute->plen,
+                                     xroute->src_prefix, xroute->src_plen,
+                                     xroute->ifindex, xroute->proto,
                                      NULL);
-        if(metric < INFINITY && metric == xroutes[i].metric) {
-            for(j = 0; j < numroutes; j++) {
-                if(xroutes[i].plen == routes[j].plen &&
-                   memcmp(xroutes[i].prefix, routes[j].prefix, 16) == 0 &&
-                   xroutes[i].ifindex == routes[j].ifindex &&
-                   xroutes[i].proto == routes[j].proto) {
+        if(metric < INFINITY && metric == xroute->metric) {
+	  /* FIXME this is our nlogn bad boy. Which we can't fix yet,
+	     cause we have to hash everything */
+	        for(j = 0; j < numroutes; j++) {
+                if(xroute->plen == routes[j].plen &&
+                   memcmp(&xroute->prefix, routes[j].prefix, 16) == 0 &&
+                   xroute->ifindex == routes[j].ifindex &&
+                   xroute->proto == routes[j].proto) {
                     export = 1;
                     break;
                 }
@@ -322,11 +280,11 @@ check_xroutes(int send_updates)
             unsigned char prefix[16], plen;
             unsigned char src_prefix[16], src_plen;
             struct babel_route *route;
-            memcpy(prefix, xroutes[i].prefix, 16);
-            plen = xroutes[i].plen;
-            memcpy(src_prefix, xroutes[i].src_prefix, 16);
-            src_plen = xroutes[i].src_plen;
-            flush_xroute(&xroutes[i]);
+            memcpy(prefix, &xroute->prefix, 16);
+            plen = xroute->plen;
+            memcpy(src_prefix, &xroute->src_prefix, 16);
+            src_plen = xroute->src_plen;
+            flush_xroute(xroute);
             route = find_best_route(prefix, plen, src_prefix, src_plen, 1,NULL);
             if(route)
                 install_route(route);
@@ -336,7 +294,7 @@ check_xroutes(int send_updates)
                 send_update_resend(NULL, prefix, plen, src_prefix, src_plen);
             change = 1;
         } else {
-            i++;
+	  i++; // I am confuzzled here. Do we keep matching?
         }
     }
 

@@ -1115,7 +1115,7 @@ static void
 dump_tables(FILE *out)
 {
     struct neighbour *neigh;
-    struct xroute_stream *xroutes;
+    struct xroute *xroute, *tmp;
     struct route_stream *routes;
 
     fprintf(out, "\n");
@@ -1137,14 +1137,8 @@ dump_tables(FILE *out)
                 if_up(neigh->ifp) ? "" : " (down)");
     }
 
-    xroutes = xroute_stream();
-    if(xroutes) {
-        while(1) {
-            struct xroute *xroute = xroute_stream_next(xroutes);
-            if(xroute == NULL) break;
+    HASH_ITER(hh, xroutes, xroute, tmp) {
             dump_xroute(out, xroute);
-        }
-        xroute_stream_done(xroutes);
     }
 
     routes = route_stream(ROUTE_ALL);
