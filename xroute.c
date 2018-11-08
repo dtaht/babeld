@@ -450,22 +450,17 @@ check_xroutes(int send_updates)
                 send_update_resend(NULL, prefix, plen, src_prefix, src_plen);
             }
         } else {
-            /* It fits */
-            if(routes[i].metric >= INFINITY) {
-                flush_xroute(&xroutes[j]);
-            } else if(routes[i].metric != xroutes[j].metric ||
-                      routes[i].proto != xroutes[j].proto) {
+            if(routes[i].metric != xroutes[j].metric ||
+               routes[i].proto != xroutes[j].proto) {
                 xroutes[j].metric = routes[i].metric;
                 xroutes[j].proto = routes[i].proto;
                 local_notify_xroute(&xroutes[j], LOCAL_CHANGE);
                 if(send_updates)
                     send_update(NULL, 0, xroutes[j].prefix, xroutes[j].plen,
                                 xroutes[j].src_prefix, xroutes[j].src_plen);
-                j++;
-            } else {
-                j++;
             }
             i++;
+            j++;
         }
     }
 
