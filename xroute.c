@@ -76,6 +76,7 @@ flush_xroute(struct xroute *xroute)
 {
     local_notify_xroute(xroute, LOCAL_FLUSH);
     HASH_DEL(xroutes, xroute);
+    free(xroute);
     numxroutes--;
 }
 
