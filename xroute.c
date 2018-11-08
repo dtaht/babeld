@@ -391,6 +391,12 @@ check_xroutes(int send_updates)
     i = 0;
     j = 0;
     while(i < numroutes || j < numxroutes) {
+        /* Ignore xroutes filtered out. */
+        if(j < numxroutes && xroutes[j].metric >= INFINITY) {
+            j++;
+            continue;
+        }
+
         if(i >= numroutes)
             rc = +1;
         else if(j >= numxroutes)
