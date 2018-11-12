@@ -7,15 +7,15 @@ DEFINES = $(PLATFORM_DEFINES)
 
 CFLAGS = $(CDEBUGFLAGS) $(DEFINES) $(EXTRA_DEFINES)
 
-LDLIBS = -lrt
+LDLIBS = -lrt -lcrypto -lssl
 
 SRCS = babeld.c net.c kernel.c util.c interface.c source.c neighbour.c \
-       route.c xroute.c message.c resend.c configuration.c local.c \
-       disambiguation.c rule.c
+       route.c xroute.c anm.c message.c hmac.c resend.c configuration.c \
+       local.c disambiguation.c rule.c
 
 OBJS = babeld.o net.o kernel.o util.o interface.o source.o neighbour.o \
-       route.o xroute.o message.o resend.o configuration.o local.o \
-       disambiguation.o rule.o
+       route.o xroute.o anm.o message.o hmac.o resend.o configuration.o \
+       local.o disambiguation.o rule.o
 
 babeld: $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o babeld $(OBJS) $(LDLIBS)

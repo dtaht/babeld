@@ -27,6 +27,7 @@ THE SOFTWARE.
 #include <sys/time.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 #include "babeld.h"
 #include "util.h"
@@ -40,6 +41,8 @@ THE SOFTWARE.
 #include "resend.h"
 #include "message.h"
 #include "configuration.h"
+#include "hmac.h"
+#include "anm.h"
 
 unsigned char packet_header[4] = {42, 2};
 
@@ -47,7 +50,7 @@ int split_horizon = 1;
 
 unsigned short myseqno = 0;
 struct timeval seqno_time = {0, 0};
-
+unsigned char last_tspc[6] = {0};
 extern const unsigned char v4prefix[16];
 
 #define MAX_CHANNEL_HOPS 20
@@ -238,11 +241,13 @@ static int
 parse_ihu_subtlv(const unsigned char *a, int alen,
                  unsigned int *timestamp1_return,
                  unsigned int *timestamp2_return,
-                 int *have_timestamp_return)
+                 int *have_timestamp_return,
+                 int *have_fresh_tspc_echo_return)
 {
     int type, len, i = 0;
     int have_timestamp = 0;
-    unsigned int timestamp1, timestamp2;
+    unsigned int timestamp1 = 0, timestamp2 = 0;
+    int have_fresh_tspc_echo = 0;
 
     while(i < alen) {
         type = a[0];
@@ -274,6 +279,16 @@ parse_ihu_subtlv(const unsigned char *a, int alen,
                         "Received incorrect RTT sub-TLV on IHU.\n");
                 /* But don't break. */
             }
+        } else if(type == SUBTLV_ECHO){
+            unsigned int ts;
+            unsigned short pc;
+            gettime(&now);
+            DO_NTOHL(ts, a + i + 2);
+            DO_NTOHS(pc, a + i + 6);
+            debugf("(echo)TS:%u, PC: %hu.\n" ,ts, pc);
+	    if(check_echo(ts, last_tspc)){
+                have_fresh_tspc_echo = 1;
+	    }
         } else {
             debugf("Received unknown%s IHU sub-TLV %d.\n",
                    (type & 0x80) != 0 ? " mandatory" : "", type);
@@ -287,9 +302,10 @@ parse_ihu_subtlv(const unsigned char *a, int alen,
         *timestamp1_return = timestamp1;
         *timestamp2_return = timestamp2;
     }
-    if(have_timestamp_return) {
+    if(have_timestamp_return)
         *have_timestamp_return = have_timestamp;
-    }
+    if(have_fresh_tspc_echo_return)
+        *have_fresh_tspc_echo_return = have_fresh_tspc_echo;
     return 1;
 }
 
@@ -427,9 +443,79 @@ network_address(int ae, const unsigned char *a, unsigned int len,
     return network_prefix(ae, -1, 0, a, NULL, len, a_r);
 }
 
+static int
+preparse_tspc(const unsigned char *packet, int bodylen,
+              struct neighbour *neigh, struct interface *ifp)
+{
+    int i, nb_tspc;
+    const unsigned char *message;
+    unsigned char type, len;
+    struct anm *anm;
+    int fresh_echo = 0;
+    anm = find_anm(neigh->address, ifp);
+    if(anm == NULL) {
+	unsigned char tspc_init[6];
+	memset(tspc_init, 0, 6);
+	anm = add_anm(neigh->address, ifp, tspc_init);
+        if(anm == NULL) {
+	    fprintf(stderr, "Couldn't create ANM.\n");
+            return -1;
+	}
+    }
+    nb_tspc = 0;
+    i = 0;
+    while(i < bodylen) {
+	message = packet + 4 + i;
+	type = message[0];
+	if(type == MESSAGE_PAD1) {
+	    i++;
+	    continue;
+	}
+	if(i + 1 > bodylen) {
+            fprintf(stderr, "Received truncated message.\n");
+            break;
+        }
+	len = message[1];
+	if(i + len > bodylen) {
+            fprintf(stderr, "Received truncated message.\n");
+            break;
+        }
+	if(type == MESSAGE_TSPC) {
+            unsigned char tspc[6];
+	    memcpy(tspc, message + 2, 6);
+	    if(memcmp(anm->last_tspc, tspc, 6) >= 0)
+		return 0;
+	    memcpy(anm->last_tspc, tspc, 6);
+	    nb_tspc++;
+        } else if(type == MESSAGE_IHU && !fresh_echo) {
+            int rc;
+            unsigned char address[16];
+            if(len < 6)
+                goto done;
+            rc = network_address(message[2], message + 8, len - 6, address);
+            if(rc < 0)
+                goto done;
+            if(message[2] == 0 || interface_ll_address(ifp, address)) {
+                rc = parse_ihu_subtlv(message + 8 + rc, len - 6 - rc,
+                                      NULL, NULL, NULL, &fresh_echo);
+            }
+        }
+    done:
+	i += len + 2;
+    }
+    if(nb_tspc != 1) {
+	fprintf(stderr, "Refuse TS/PC.\n");
+	return 0;
+    }
+    if(fresh_echo)
+        neigh->echo_receive_time = now;
+    return 1;
+}
+
 void
 parse_packet(const unsigned char *from, struct interface *ifp,
-             const unsigned char *packet, int packetlen)
+             const unsigned char *packet, int packetlen,
+	     const unsigned char *to)
 {
     int i;
     const unsigned char *message;
@@ -480,6 +566,19 @@ parse_packet(const unsigned char *from, struct interface *ifp,
         fprintf(stderr, "Received truncated packet (%d + 4 > %d).\n",
                 bodylen, packetlen);
         bodylen = packetlen - 4;
+    }
+
+    if(ifp->buf.key != NULL && ifp->buf.key->type != 0) {
+	if(check_hmac(packet, packetlen, bodylen, neigh->address,
+		      to) != 1) {
+	    fprintf(stderr, "Received wrong hmac.\n");
+	    return;
+	}
+
+	if(preparse_tspc(packet, bodylen, neigh, ifp) == 0) {
+	    fprintf(stderr, "Received wrong TS/PC.\n");
+	    return;
+	}
     }
 
     i = 0;
@@ -571,7 +670,7 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                 int changed;
                 rc = parse_ihu_subtlv(message + 8 + rc, len - 6 - rc,
                                       &hello_send_us, &hello_rtt_receive_time,
-                                      NULL);
+                                      NULL, NULL);
                 if(rc < 0)
                     goto done;
                 changed = txcost != neigh->txcost;
@@ -815,6 +914,8 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                    format_eui64(message + 8), seqno);
             handle_request(neigh, prefix, plen, src_prefix, src_plen,
                            message[6], seqno, message + 8);
+        } else if(type == MESSAGE_TSPC) {
+            /* We're dealing with the TS/PC message in check_tspc(). */
         } else {
             debugf("Received unknown packet type %d from %s on %s.\n",
                    type, format_address(from), ifp->name);
@@ -896,16 +997,26 @@ void
 flushbuf(struct buffered *buf)
 {
     int rc;
+    int hmac_space = 0;
 
     assert(buf->len <= buf->size);
 
     if(buf->len > 0) {
+	if(buf->key != NULL && buf->key->type != 0)
+	    add_tspc(buf);
         debugf("  (flushing %d buffered bytes)\n", buf->len);
         DO_HTONS(packet_header + 2, buf->len);
         fill_rtt_message(buf);
+	if(buf->key != NULL && buf->key->type != 0) {
+	    hmac_space = add_hmac(packet_header, buf, 1);
+	    if(hmac_space == -1) {
+		fprintf(stderr, "Couldn't add HMAC.\n");
+		return;
+	    }
+	}
         rc = babel_send(protocol_socket,
                         packet_header, sizeof(packet_header),
-                        buf->buf, buf->len,
+                        buf->buf, (buf->len + hmac_space),
                         (struct sockaddr*)&buf->sin6,
                         sizeof(buf->sin6));
         if(rc < 0)
@@ -945,14 +1056,18 @@ schedule_flush_now(struct buffered *buf)
 static void
 ensure_space(struct buffered *buf, int space)
 {
+    if(buf->key != NULL)
+	space += MAX_HMAC_SPACE + TLV_TSPC_LEN;
     if(buf->size - buf->len < space)
-        flushbuf(buf);
+	flushbuf(buf);
 }
 
 static void
 start_message(struct buffered *buf, int type, int len)
 {
-    if(buf->size - buf->len < len + 2)
+    int space =
+	buf->key == NULL ? len + 2 : len + 2 + MAX_HMAC_SPACE + TLV_TSPC_LEN;
+    if(buf->size - buf->len < space)
         flushbuf(buf);
     buf->buf[buf->len++] = type;
     buf->buf[buf->len++] = len;
@@ -993,6 +1108,23 @@ accumulate_bytes(struct buffered *buf,
 {
     memcpy(buf->buf + buf->len, value, len);
     buf->len += len;
+}
+
+void
+add_tspc(struct buffered *buf)
+{
+    struct timespec realtime;
+    unsigned short last_pc;
+    start_message(buf, MESSAGE_TSPC, 6);
+    clock_gettime(CLOCK_REALTIME, &realtime);
+    DO_HTONL(last_tspc, realtime.tv_sec);
+    DO_NTOHS(last_pc, last_tspc + 4);
+    last_pc++;
+    DO_HTONS(last_tspc + 4, last_pc);
+    accumulate_bytes(buf, last_tspc, 6);
+    debugf("adding ts/ps with ts: %ld and pc: %hu \n",
+           realtime.tv_sec, last_pc);
+    end_message(buf, MESSAGE_TSPC, 6);
 }
 
 void
@@ -1109,7 +1241,7 @@ really_buffer_update(struct buffered *buf, struct interface *ifp,
                   buf->prefix[omit] == prefix[omit])
                 omit++;
         }
-        if(!buf->have_prefix || plen >= 48)
+        if(!is_ss && (!buf->have_prefix || plen >= 48))
             flags |= 0x80;
         real_prefix = prefix;
         real_plen = plen;
@@ -1118,7 +1250,8 @@ really_buffer_update(struct buffered *buf, struct interface *ifp,
     }
 
     if(!buf->have_id || memcmp(id, buf->id, 8) != 0) {
-        if(real_plen == 128 && memcmp(real_prefix + 8, id, 8) == 0) {
+        if(!is_ss && real_plen == 128 &&
+           memcmp(real_prefix + 8, id, 8) == 0) {
             flags |= 0x40;
         } else {
             start_message(buf, MESSAGE_ROUTER_ID, 10);
@@ -1591,14 +1724,15 @@ send_self_update(struct interface *ifp)
 }
 
 void
-buffer_ihu(struct buffered *buf, unsigned short rxcost,
+buffer_ihu(struct interface *ifp, unsigned short rxcost,
            unsigned short interval, const unsigned char *address,
-           int rtt_data, unsigned int t1, unsigned int t2)
+           int rtt_data, int echo, unsigned int t1, unsigned int t2) 
 {
     int msglen, ll;
+    struct buffered *buf = &ifp->buf;
 
     ll = linklocal(address);
-    msglen = (ll ? 14 : 200) + (rtt_data ? 10 : 0);
+    msglen = (ll ? 14 : 200) + (rtt_data ? 10 : 0) + (echo ? 8 : 0);
 
     start_message(buf, MESSAGE_IHU, msglen);
     accumulate_byte(buf, ll ? 3 : 2);
@@ -1615,6 +1749,18 @@ buffer_ihu(struct buffered *buf, unsigned short rxcost,
         accumulate_int(buf, t1);
         accumulate_int(buf, t2);
     }
+    if(echo) {
+        struct anm *anm;
+        debugf("add echo\n");
+        anm = find_anm(address, ifp); /* can return null */
+	if(anm) {
+        accumulate_byte(buf, SUBTLV_ECHO);
+	accumulate_byte(buf, 6);
+        accumulate_bytes(buf, anm->last_tspc, 6);
+	} else {
+	    fprintf(stderr,"Could not find key for SUBTLV_ECHO\n");
+	}
+    }
     end_message(buf, MESSAGE_IHU, msglen);
 }
 
@@ -1624,6 +1770,8 @@ send_ihu(struct neighbour *neigh, struct interface *ifp)
 {
     int rxcost, interval;
     int send_rtt_data;
+    int send_echo = 0;
+    struct anm *anm;
 
     if(neigh == NULL && ifp == NULL) {
         struct interface *ifp_aux;
@@ -1643,13 +1791,16 @@ send_ihu(struct neighbour *neigh, struct interface *ifp)
         return;
     }
 
-
     if(ifp && neigh->ifp != ifp)
         return;
 
     ifp = neigh->ifp;
     if(!if_up(ifp))
         return;
+
+    anm = find_anm(neigh->address, ifp);
+    if(anm != NULL)
+	send_echo = 1;
 
     rxcost = neighbour_rxcost(neigh);
     interval = (ifp->hello_interval * 3 + 9) / 10;
@@ -1668,8 +1819,8 @@ send_ihu(struct neighbour *neigh, struct interface *ifp)
         send_rtt_data = 0;
     }
 
-    buffer_ihu(&ifp->buf, rxcost, interval, neigh->address,
-               send_rtt_data, neigh->hello_send_us,
+    buffer_ihu(ifp, rxcost, interval, neigh->address,
+               send_rtt_data, send_echo, neigh->hello_send_us,
                time_us(neigh->hello_rtt_receive_time));
 
 }
@@ -1687,8 +1838,6 @@ send_marginal_ihu(struct interface *ifp)
     }
 }
 
-/* Standard wildcard request with prefix == NULL && src_prefix == zeroes,
-   Specific wildcard request with prefix == zeroes && src_prefix == NULL. */
 static void
 send_request(struct buffered *buf,
              const unsigned char *prefix, unsigned char plen,
@@ -1869,6 +2018,7 @@ send_multicast_multihop_request(struct interface *ifp,
                               src_prefix, src_plen,
                               seqno, id, hop_count);
     }
+
 }
 
 void

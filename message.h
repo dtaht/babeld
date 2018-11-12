@@ -21,6 +21,9 @@ THE SOFTWARE.
 */
 
 #define MAX_BUFFERED_UPDATES 200
+#define MAX_HMAC_SPACE 48
+
+#define TLV_TSPC_LEN 8
 
 #define MESSAGE_PAD1 0
 #define MESSAGE_PADN 1
@@ -34,12 +37,15 @@ THE SOFTWARE.
 #define MESSAGE_REQUEST 9
 #define MESSAGE_MH_REQUEST 10
 /* 11 and 12 are for authentication */
+#define MESSAGE_TSPC 11
+#define MESSAGE_HMAC 12
 
 /* Protocol extension through sub-TLVs. */
 #define SUBTLV_PAD1 0
 #define SUBTLV_PADN 1
 #define SUBTLV_DIVERSITY 2       /* Also known as babelz. */
 #define SUBTLV_TIMESTAMP 3       /* Used to compute RTT. */
+#define SUBTLV_ECHO 4
 #define SUBTLV_SOURCE_PREFIX 128 /* Source-specific routing. */
 
 extern unsigned short myseqno;
@@ -51,9 +57,11 @@ extern int split_horizon;
 extern unsigned char packet_header[4];
 
 void parse_packet(const unsigned char *from, struct interface *ifp,
-                  const unsigned char *packet, int packetlen);
+                  const unsigned char *packet, int packetlen,
+		  const unsigned char *to);
 void flushbuf(struct buffered *buf);
 void flushupdates(struct interface *ifp);
+void add_tspc(struct buffered *buf);
 void send_ack(struct neighbour *neigh, unsigned short nonce,
               unsigned short interval);
 void send_hello_noihu(struct interface *ifp, unsigned interval);

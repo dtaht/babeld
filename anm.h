@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2007, 2008 by Juliusz Chroboczek
+Copyright (c) 2018 by Clara Dô and Weronika Kolodziejak
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,11 +20,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-int babel_socket(int port);
-int babel_recv(int s, void *buf, int buflen, struct sockaddr *sin, int slen,
-	   unsigned char *src_return);
-int babel_send(int s,
-               const void *buf1, int buflen1, const void *buf2, int buflen2,
-               const struct sockaddr *sin, int slen);
-int tcp_server_socket(int port, int local);
-int unix_server_socket(const char *path);
+struct anm {
+  unsigned char from[16];
+  struct interface *ifp;
+  unsigned char last_tspc[6];
+};
+
+struct anm *find_anm(const unsigned char *from, const struct interface *ifp);
+struct anm *add_anm(const unsigned char *from, struct interface *ifp,
+                    unsigned char *last_tspc);

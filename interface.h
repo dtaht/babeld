@@ -35,6 +35,13 @@ struct buffered_update {
 #define IF_TYPE_TUNNEL 3
 
 /* If you modify this structure, also modify the merge_ifconf function. */
+struct key {
+    char *id;
+    int type;
+    int len;
+    unsigned char *value;
+    unsigned short ref_count;
+};
 
 struct interface_conf {
     char *ifname;
@@ -53,6 +60,7 @@ struct interface_conf {
     unsigned int rtt_min;
     unsigned int rtt_max;
     unsigned int max_rtt_penalty;
+    struct key *key;
     struct interface_conf *next;
 };
 
@@ -90,6 +98,8 @@ struct buffered {
     char have_id;
     char have_nh;
     char have_prefix;
+    struct key *key;
+    unsigned char ll[16];
     unsigned char id[8];
     unsigned char nh[4];
     unsigned char prefix[16];

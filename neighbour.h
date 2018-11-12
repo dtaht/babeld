@@ -41,6 +41,7 @@ struct neighbour {
        according to remote clock. */
     unsigned int hello_send_us;
     struct timeval hello_rtt_receive_time;
+    struct timeval echo_receive_time;
     unsigned int rtt;
     struct timeval rtt_time;
     struct interface *ifp;

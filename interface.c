@@ -37,6 +37,7 @@ THE SOFTWARE.
 #include "kernel.h"
 #include "interface.h"
 #include "neighbour.h"
+#include "hmac.h"
 #include "message.h"
 #include "route.h"
 #include "configuration.h"
@@ -266,6 +267,10 @@ check_link_local_addresses(struct interface *ifp)
                 ifp->numll = rc;
             }
             local_notify_interface(ifp, LOCAL_CHANGE);
+	    if(ifp->numll > 0)
+		memcpy(ifp->buf.ll, ifp->ll[0], 16);
+	    else
+		memset(ifp->buf.ll, 0, 16);
         }
     }
 
@@ -305,7 +310,12 @@ interface_up(struct interface *ifp, int up)
         memcpy(&ifp->buf.sin6.sin6_addr, protocol_group, 16);
         ifp->buf.sin6.sin6_port = htons(protocol_port);
         ifp->buf.sin6.sin6_scope_id = ifp->ifindex;
-
+	if(ifp->numll > 0)
+	    memcpy(ifp->buf.ll, ifp->ll[0], 16);
+	else
+	    memset(ifp->buf.ll, 0, 16);
+	if(ifp->conf != NULL && ifp->conf->key != NULL)
+	    ifp->buf.key = retain_key(ifp->conf->key);
         mtu = kernel_interface_mtu(ifp->name, ifp->ifindex);
         if(mtu < 0) {
             fprintf(stderr, "Warning: couldn't get MTU of interface %s (%u).\n",
