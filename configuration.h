@@ -61,19 +61,11 @@ int parse_config_from_file(const char *filename, int *line_return);
 int parse_config_from_string(char *string, int n, const char **message_return);
 void renumber_filters(void);
 
-int input_filter(const unsigned char *id,
-                 const unsigned char *prefix, unsigned short plen,
-                 const unsigned char *src_prefix, unsigned short src_plen,
+int input_filter(const unsigned char *id, const struct datum *dt,
                  const unsigned char *neigh, unsigned int ifindex);
-int output_filter(const unsigned char *id,
-                  const unsigned char *prefix, unsigned short plen,
-                  const unsigned char *src_prefix, unsigned short src_plen,
+int output_filter(const unsigned char *id, const struct datum *dt,
                   unsigned int ifindex);
-int redistribute_filter(const unsigned char *prefix, unsigned short plen,
-                    const unsigned char *src_prefix, unsigned short src_plen,
-                    unsigned int ifindex, int proto,
-                    struct filter_result *result);
-int install_filter(const unsigned char *prefix, unsigned short plen,
-                   const unsigned char *src_prefix, unsigned short src_plen,
-                   struct filter_result *result);
+int redistribute_filter(const struct datum *dt, unsigned int ifindex,
+                        int proto, struct filter_result *result);
+int install_filter(const struct datum *dt, struct filter_result *result);
 int finalise_config(void);

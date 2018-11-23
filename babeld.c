@@ -582,7 +582,7 @@ main(int argc, char **argv)
         send_hello(ifp);
         send_wildcard_retraction(ifp);
         send_self_update(ifp);
-        send_multicast_request(ifp, NULL, 0, NULL, 0);
+        send_multicast_request(ifp, NULL);
         flushupdates(ifp);
         flushbuf(&ifp->buf);
     }
@@ -764,7 +764,7 @@ main(int argc, char **argv)
             if(timeval_compare(&now, &ifp->hello_timeout) >= 0)
                 send_hello(ifp);
             if(timeval_compare(&now, &ifp->update_timeout) >= 0)
-                send_update(ifp, 0, NULL, 0, NULL, 0);
+                send_update(ifp, 0, NULL);
             if(timeval_compare(&now, &ifp->update_flush_timeout) >= 0)
                 flushupdates(ifp);
         }
@@ -1063,6 +1063,7 @@ dump_route(FILE *out, struct babel_route *route)
         memcmp(route->nexthop, route->neigh->address, 16) == 0 ?
         NULL : route->nexthop;
     char channels[100];
+    int is_ss = !is_default(route->src->dt.src_prefix, route->src->dt.src_plen);
 
     if(route->channels_len == 0) {
         channels[0] = '\0';
@@ -1081,10 +1082,10 @@ dump_route(FILE *out, struct babel_route *route)
 
     fprintf(out, "%s%s%s metric %d (%d) refmetric %d id %s "
             "seqno %d%s age %d via %s neigh %s%s%s%s\n",
-            format_prefix(route->src->prefix, route->src->plen),
-            route->src->src_plen > 0 ? " from " : "",
-            route->src->src_plen > 0 ?
-            format_prefix(route->src->src_prefix, route->src->src_plen) : "",
+            format_prefix(route->src->dt.prefix, route->src->dt.plen),
+            is_ss ? " from " : "",
+            is_ss ? format_prefix(route->src->dt.src_prefix,
+                                  route->src->dt.src_plen) : "",
             route_metric(route), route_smoothed_metric(route), route->refmetric,
             format_eui64(route->src->id),
             (int)route->seqno,
@@ -1101,11 +1102,12 @@ dump_route(FILE *out, struct babel_route *route)
 static void
 dump_xroute(FILE *out, struct xroute *xroute)
 {
+    int is_ss = !is_default(xroute->dt.src_prefix, xroute->dt.src_plen);
     fprintf(out, "%s%s%s metric %d (exported)\n",
-            format_prefix(xroute->prefix, xroute->plen),
-            xroute->src_plen > 0 ? " from " : "",
-            xroute->src_plen > 0 ?
-            format_prefix(xroute->src_prefix, xroute->src_plen) : "",
+            format_prefix(xroute->dt.prefix, xroute->dt.plen),
+            is_ss ? " from " : "",
+            is_ss ? format_prefix(xroute->dt.src_prefix, xroute->dt.src_plen) :
+            "",
             xroute->metric);
 }
 

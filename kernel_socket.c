@@ -591,7 +591,7 @@ print_kernel_route(int add, struct kernel_route *route)
             "%s kernel route: dest: %s gw: %s metric: %d if: %s(%u) \n",
             add == RTM_ADD ? "Add" :
             add == RTM_DELETE ? "Delete" : "Change",
-            format_prefix(route->prefix, route->plen),
+            format_prefix(route->dt.prefix, route->dt.plen),
             format_address(route->gw),
             route->metric,
             ifname, route->ifindex
@@ -635,7 +635,7 @@ parse_kernel_route(const struct rt_msghdr *rtm, struct kernel_route *route)
     rta += ROUNDUP(sa->sa_len);
     if(sa->sa_family == AF_INET6) {
         struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)sa;
-        memcpy(route->prefix, &sin6->sin6_addr, 16);
+        memcpy(route->dt.prefix, &sin6->sin6_addr, 16);
         if(IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)
            || IN6_IS_ADDR_MC_LINKLOCAL(&sin6->sin6_addr))
             return -1;
@@ -647,7 +647,7 @@ parse_kernel_route(const struct rt_msghdr *rtm, struct kernel_route *route)
 #endif
         if(IN_MULTICAST(ntohl(sin->sin_addr.s_addr)))
             return -1;
-        v4tov6(route->prefix, (unsigned char *)&sin->sin_addr);
+        v4tov6(route->dt.prefix, (unsigned char *)&sin->sin_addr);
     } else {
         return -1;
     }
@@ -675,16 +675,21 @@ parse_kernel_route(const struct rt_msghdr *rtm, struct kernel_route *route)
     if((rtm->rtm_addrs & RTA_NETMASK) != 0) {
         sa = (struct sockaddr *)rta;
         rta += ROUNDUP(sa->sa_len);
-        if(!v4mapped(route->prefix)) {
+        if(!v4mapped(route->dt.prefix)) {
             struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)sa;
-            route->plen = mask2len((unsigned char*)&sin6->sin6_addr, 16);
+            route->dt.plen = mask2len((unsigned char*)&sin6->sin6_addr, 16);
         } else {
             struct sockaddr_in *sin = (struct sockaddr_in *)sa;
-            route->plen = mask2len((unsigned char*)&sin->sin_addr, 4);
+            route->dt.plen = mask2len((unsigned char*)&sin->sin_addr, 4);
         }
     }
-    if(v4mapped(route->prefix)) route->plen += 96;
-    if(rtm->rtm_flags & RTF_HOST) route->plen = 128;
+    if(v4mapped(route->dt.prefix)) {
+        const unsigned char zeroes[4] = {0, 0, 0, 0};
+        route->dt.plen += 96;
+        v4tov6(route->dt.src_prefix, zeroes);
+        route->dt.src_plen = 96;
+    }
+    if(rtm->rtm_flags & RTF_HOST) route->dt.plen = 128;
 
     return 0;
 }

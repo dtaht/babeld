@@ -245,7 +245,7 @@ check_link_local_addresses(struct interface *ifp)
         if(rc == ifp->numll) {
             changed = 0;
             for(i = 0; i < rc; i++) {
-                if(memcmp(ifp->ll[i], ll[i].prefix, 16) != 0) {
+                if(memcmp(ifp->ll[i], ll[i].dt.prefix, 16) != 0) {
                     changed = 1;
                     break;
                 }
@@ -262,7 +262,7 @@ check_link_local_addresses(struct interface *ifp)
                 perror("malloc(ll)");
             } else {
                 for(i = 0; i < rc; i++)
-                    memcpy(ifp->ll[i], ll[i].prefix, 16);
+                    memcpy(ifp->ll[i], ll[i].dt.prefix, 16);
                 ifp->numll = rc;
             }
             local_notify_interface(ifp, LOCAL_CHANGE);
@@ -479,8 +479,8 @@ interface_up(struct interface *ifp, int up)
         set_timeout(&ifp->update_timeout, ifp->update_interval);
         send_hello(ifp);
         if(rc > 0)
-            send_update(ifp, 0, NULL, 0, NULL, 0);
-        send_multicast_request(ifp, NULL, 0, NULL, 0);
+            send_update(ifp, 0, NULL);
+        send_multicast_request(ifp, NULL);
     } else {
         flush_interface_routes(ifp, 0);
         ifp->buf.len = 0;
@@ -567,8 +567,8 @@ check_interfaces(void)
             check_interface_channel(ifp);
             rc = check_interface_ipv4(ifp);
             if(rc > 0) {
-                send_multicast_request(ifp, NULL, 0, NULL, 0);
-                send_update(ifp, 0, NULL, 0, NULL, 0);
+                send_multicast_request(ifp, NULL);
+                send_update(ifp, 0, NULL);
             }
         }
     }

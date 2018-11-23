@@ -20,11 +20,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#include "datum.h"
+
 struct xroute {
-    unsigned char prefix[16];
-    unsigned char plen;
-    unsigned char src_prefix[16];
-    unsigned char src_plen;
+    struct datum dt;
     unsigned short metric;
     unsigned int ifindex;
     int proto;
@@ -32,11 +31,8 @@ struct xroute {
 
 struct xroute_stream;
 
-struct xroute *find_xroute(const unsigned char *prefix, unsigned char plen,
-                const unsigned char *src_prefix, unsigned char src_plen);
-int add_xroute(unsigned char prefix[16], unsigned char plen,
-               unsigned char src_prefix[16], unsigned char src_plen,
-               unsigned short metric, unsigned int ifindex, int proto);
+int add_xroute(struct datum *dt, unsigned short metric, unsigned int ifindex, int proto);
+struct xroute *find_xroute(const struct datum *dt);
 void flush_xroute(struct xroute *xroute);
 int xroutes_estimate(void);
 struct xroute_stream *xroute_stream();

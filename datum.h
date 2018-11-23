@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014 by Matthieu Boutier and Juliusz Chroboczek.
+Copyright (c) 20017 by Matthieu Boutier and Juliusz Chroboczek
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,9 +20,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-int disambiguate_install(const struct babel_route *route);
-int disambiguate_uninstall(const struct babel_route *route);
-int disambiguate_switch(const struct babel_route *old,
-                        const struct babel_route *new);
-int disambiguate_change_metric(const struct babel_route *route, int old_metric,
-                               int new_metric);
+#ifndef DATUM_H
+#define DATUM_H
+
+struct datum {
+    unsigned char prefix[16];
+    unsigned char plen;
+    unsigned char src_prefix[16];
+    unsigned char src_plen;
+};
+
+#endif /* DATUM_H */

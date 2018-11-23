@@ -196,10 +196,10 @@ local_notify_xroute_1(struct local_socket *s, struct xroute *xroute, int kind)
 {
     char buf[512];
     int rc;
-    const char *dst_prefix = format_prefix(xroute->prefix,
-                                           xroute->plen);
-    const char *src_prefix = format_prefix(xroute->src_prefix,
-                                           xroute->src_plen);
+    const char *dst_prefix = format_prefix(xroute->dt.prefix,
+                                           xroute->dt.plen);
+    const char *src_prefix = format_prefix(xroute->dt.src_prefix,
+                                           xroute->dt.src_plen);
 
     rc = snprintf(buf, 512, "%s xroute %s-%s prefix %s from %s metric %d\n",
                   local_kind(kind), dst_prefix, src_prefix,
@@ -233,10 +233,10 @@ local_notify_route_1(struct local_socket *s, struct babel_route *route, int kind
 {
     char buf[512];
     int rc;
-    const char *dst_prefix = format_prefix(route->src->prefix,
-                                           route->src->plen);
-    const char *src_prefix = format_prefix(route->src->src_prefix,
-                                           route->src->src_plen);
+    const char *dst_prefix = format_prefix(route->src->dt.prefix,
+                                           route->src->dt.plen);
+    const char *src_prefix = format_prefix(route->src->dt.src_prefix,
+                                           route->src->dt.src_plen);
 
     rc = snprintf(buf, 512,
                   "%s route %lx prefix %s from %s installed %s "
