@@ -40,6 +40,7 @@ THE SOFTWARE.
 #include "resend.h"
 #include "message.h"
 #include "configuration.h"
+#include "hmac.h"
 
 unsigned char packet_header[4] = {42, 2};
 
@@ -47,6 +48,10 @@ int split_horizon = 1;
 
 unsigned short myseqno = 0;
 struct timeval seqno_time = {0, 0};
+
+unsigned char last_pc[4] = {0};
+unsigned char last_nonce[32] = {0};
+int nonce_len = 10;
 
 extern const unsigned char v4prefix[16];
 
@@ -427,9 +432,93 @@ network_address(int ae, const unsigned char *a, unsigned int len,
     return network_prefix(ae, -1, 0, a, NULL, len, a_r);
 }
 
+static int
+preparse_packet(const unsigned char *packet, int bodylen,
+              struct neighbour *neigh, struct interface *ifp)
+{
+    int i;
+    const unsigned char *message;
+    unsigned char type, len;
+    int challenge_success = 0;
+    int have_nonce = 0, nonce_len;
+    unsigned char pc[4], nonce[256];
+
+    i = 0;
+    while(i < bodylen) {
+	message = packet + 4 + i;
+	type = message[0];
+	if(type == MESSAGE_PAD1) {
+	    i++;
+	    continue;
+	}
+	if(i + 1 > bodylen) {
+            fprintf(stderr, "Received truncated message.\n");
+            break;
+        }
+	len = message[1];
+	if(i + len > bodylen) {
+            fprintf(stderr, "Received truncated message.\n");
+            break;
+        }
+	if(type == MESSAGE_PC) {
+            debugf("Received PC from %s.\n",
+                   format_address(neigh->address));
+            memcpy(pc, message + 2, 4);
+            nonce_len = len - 4;
+            memcpy(nonce, message + 6, len - 4);
+            have_nonce = 1;
+        } else if(type == MESSAGE_CHALLENGE_RESPONSE) {
+            debugf("Received challenge response from %s.\n",
+                   format_address(neigh->address));
+	    gettime(&now);
+	    if(len == 10 &&
+               memcmp(neigh->challenge_nonce, message + 2, 10) == 0 &&
+	       timeval_compare(&now, &neigh->challenge_deadline) < 0) {
+                challenge_success = 1;
+            } else {
+                debugf("Challenge failed.\n");
+            }
+	} else if(type == MESSAGE_CHALLENGE_REQUEST) {
+            debugf("Received challenge request from %s.\n",
+                   format_address(neigh->address));
+	    unsigned char crypto_nonce[len];
+	    memcpy(crypto_nonce, message + 2, len);
+	    send_challenge_reply(neigh, crypto_nonce, len);
+	}
+	i += len + 2;
+    }
+
+    if(!have_nonce) {
+        debugf("No PC in packet.\n");
+        return 0;
+    }
+
+    if(neigh->have_nonce &&
+       neigh->nonce_len == nonce_len &&
+       memcmp(nonce, neigh->crypto_nonce, nonce_len) == 0) {
+        if(memcmp(neigh->pc, pc, 4) < 0) {
+            memcpy(neigh->pc, pc, 4);
+            return 1;
+        } else {
+            debugf("Out of order PC.\n");
+            return 0;
+        }
+    } else if(challenge_success) {
+        neigh->nonce_len = nonce_len;
+        memcpy(neigh->crypto_nonce, nonce, nonce_len);
+        memcpy(neigh->pc, pc, 4);
+        neigh->have_nonce = 1;
+        return 1;
+    } else {
+        send_challenge_req(neigh);
+        return 0;
+    }
+}
+
 void
 parse_packet(const unsigned char *from, struct interface *ifp,
-             const unsigned char *packet, int packetlen)
+             const unsigned char *packet, int packetlen,
+	     const unsigned char *to)
 {
     int i;
     const unsigned char *message;
@@ -480,6 +569,20 @@ parse_packet(const unsigned char *from, struct interface *ifp,
         fprintf(stderr, "Received truncated packet (%d + 4 > %d).\n",
                 bodylen, packetlen);
         bodylen = packetlen - 4;
+    }
+
+    if(ifp->buf.key != NULL && ifp->buf.key->type != 0) {
+	if(check_hmac(packet, packetlen, bodylen, from, to) != 1) {
+	    fprintf(stderr, "Received wrong hmac.\n");
+	    return;
+	}
+    }
+
+    if(ifp->buf.key != NULL && ifp->buf.key->type != 0) {
+	if(preparse_packet(packet, bodylen, neigh, ifp) == 0) {
+	    fprintf(stderr, "Received wrong PC or failed the challenge.\n");
+	    return;
+	}
     }
 
     i = 0;
@@ -812,6 +915,10 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                    format_address(from), ifp->name,
                    format_eui64(message + 8), seqno);
             handle_request(neigh, &dt, message[6], seqno, message + 8);
+        } else if(type == MESSAGE_PC ||
+		  type == MESSAGE_CHALLENGE_REQUEST ||
+		  type == MESSAGE_CHALLENGE_RESPONSE) {
+            /* We're dealing with these in preparse_packet(). */
         } else {
             debugf("Received unknown packet type %d from %s on %s.\n",
                    type, format_address(from), ifp->name);
@@ -893,16 +1000,25 @@ void
 flushbuf(struct buffered *buf)
 {
     int rc;
-
+    int hmac_space = 0;
     assert(buf->len <= buf->size);
 
     if(buf->len > 0) {
+        if(buf->key != NULL && buf->key->type != 0)
+            send_crypto_seqno(buf);
         debugf("  (flushing %d buffered bytes)\n", buf->len);
         DO_HTONS(packet_header + 2, buf->len);
         fill_rtt_message(buf);
+        if(buf->key != NULL && buf->key->type != 0) {
+            hmac_space = add_hmac(packet_header, buf, 1);
+            if(hmac_space == -1) {
+                fprintf(stderr, "Couldn't add HMAC.\n");
+                return;
+            }
+        }
         rc = babel_send(protocol_socket,
                         packet_header, sizeof(packet_header),
-                        buf->buf, buf->len,
+                        buf->buf, (buf->len + hmac_space),
                         (struct sockaddr*)&buf->sin6,
                         sizeof(buf->sin6));
         if(rc < 0)
@@ -942,6 +1058,8 @@ schedule_flush_now(struct buffered *buf)
 static void
 ensure_space(struct buffered *buf, int space)
 {
+    if(buf->key != NULL)
+        space += MAX_HMAC_SPACE + 6 + nonce_len;
     if(buf->size - buf->len < space)
         flushbuf(buf);
 }
@@ -949,7 +1067,9 @@ ensure_space(struct buffered *buf, int space)
 static void
 start_message(struct buffered *buf, int type, int len)
 {
-    if(buf->size - buf->len < len + 2)
+    int space =
+        buf->key == NULL ? len + 2 : len + 2 + MAX_HMAC_SPACE + 6 + nonce_len;
+    if(buf->size - buf->len < space)
         flushbuf(buf);
     buf->buf[buf->len++] = type;
     buf->buf[buf->len++] = len;
@@ -984,11 +1104,50 @@ accumulate_int(struct buffered *buf, unsigned int value)
     buf->len += 4;
 }
 
+
 static void
 accumulate_bytes(struct buffered *buf, const unsigned char *value, unsigned len)
 {
     memcpy(buf->buf + buf->len, value, len);
     buf->len += len;
+}
+
+void
+send_crypto_seqno(struct buffered *buf)
+{
+    start_message(buf, MESSAGE_PC, nonce_len + 4);
+    (*last_pc)++;
+    if(last_pc == 0)
+	read_random_bytes(last_nonce, nonce_len);
+    accumulate_int(buf, *last_pc);
+    accumulate_bytes(buf, last_nonce, nonce_len);
+    end_message(buf, MESSAGE_PC, nonce_len + 4);
+}
+
+void
+send_challenge_req(struct neighbour *neigh)
+{
+    debugf("Sending challenge request to %s on %s.\n",
+	   format_address(neigh->address), neigh->ifp->name);
+    read_random_bytes(neigh->challenge_nonce, 10);
+    start_message(&neigh->buf, MESSAGE_CHALLENGE_REQUEST, 10);
+    accumulate_bytes(&neigh->buf, neigh->challenge_nonce, 10);
+    end_message(&neigh->buf, MESSAGE_CHALLENGE_REQUEST, 10);
+    gettime(&now);
+    timeval_add_msec(&neigh->challenge_deadline, &now, 300);
+    schedule_flush_now(&neigh->buf);
+}
+
+void
+send_challenge_reply(struct neighbour *neigh, unsigned char *crypto_nonce,
+		     int len)
+{
+    debugf("Sending challenge reply to %s on %s.\n",
+	   format_address(neigh->address), neigh->ifp->name);
+    start_message(&neigh->buf, MESSAGE_CHALLENGE_RESPONSE, len);
+    accumulate_bytes(&neigh->buf, crypto_nonce, len);
+    end_message(&neigh->buf, MESSAGE_CHALLENGE_RESPONSE, len);
+    schedule_flush_now(&neigh->buf);
 }
 
 void

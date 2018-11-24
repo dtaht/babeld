@@ -35,7 +35,23 @@ THE SOFTWARE.
 #define MESSAGE_UPDATE 8
 #define MESSAGE_REQUEST 9
 #define MESSAGE_MH_REQUEST 10
-/* 11 and 12 are for authentication */
+
+/* 11 and 12 were for obsolete authentication */
+/* 13 through 15 were for obsolete SADR */
+
+
+
+
+/* HMAC support */
+
+#define MAX_HMAC_SPACE 48
+#define MESSAGE_PC 121
+#define MESSAGE_HMAC 122
+#define MESSAGE_CHALLENGE_REQUEST 123
+#define MESSAGE_CHALLENGE_RESPONSE 124
+
+
+
 
 /* Protocol extension through sub-TLVs. */
 #define SUBTLV_PAD1 0
@@ -53,9 +69,13 @@ extern int split_horizon;
 extern unsigned char packet_header[4];
 
 void parse_packet(const unsigned char *from, struct interface *ifp,
-                  const unsigned char *packet, int packetlen);
+                  const unsigned char *packet, int packetlen,
+  		  const unsigned char *to);
 void flushbuf(struct buffered *buf);
 void flushupdates(struct interface *ifp);
+void send_challenge_req(struct neighbour *neigh);
+void send_challenge_reply(struct neighbour *neigh, unsigned char *crypto_nonce, int len);
+void send_crypto_seqno(struct buffered *buf);
 void send_ack(struct neighbour *neigh, unsigned short nonce,
               unsigned short interval);
 void send_hello_noihu(struct interface *ifp, unsigned interval);
