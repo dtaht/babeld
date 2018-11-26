@@ -1534,7 +1534,7 @@ send_wildcard_retraction(struct interface *ifp)
 {
     if(ifp == NULL) {
         struct interface *ifp_aux;
-        FOR_ALL_INTERFACES(ifp_aux)
+        FOR_ALL_INTERFACES_UP(ifp_aux)
             send_wildcard_retraction(ifp_aux);
         return;
     }
@@ -1567,9 +1567,7 @@ send_self_update(struct interface *ifp)
     struct xroute_stream *xroutes;
     if(ifp == NULL) {
         struct interface *ifp_aux;
-        FOR_ALL_INTERFACES(ifp_aux) {
-            if(!if_up(ifp_aux))
-                continue;
+        FOR_ALL_INTERFACES_UP(ifp_aux) {
             send_self_update(ifp_aux);
         }
         return;
@@ -1627,9 +1625,8 @@ send_ihu(struct neighbour *neigh, struct interface *ifp)
 
     if(neigh == NULL && ifp == NULL) {
         struct interface *ifp_aux;
-        FOR_ALL_INTERFACES(ifp_aux) {
-            if(if_up(ifp_aux))
-                send_ihu(NULL, ifp_aux);
+        FOR_ALL_INTERFACES_UP(ifp_aux) {
+            send_ihu(NULL, ifp_aux);
         }
         return;
     }
@@ -1745,9 +1742,7 @@ send_multicast_request(struct interface *ifp,
 {
     if(ifp == NULL) {
         struct interface *ifp_auxn;
-        FOR_ALL_INTERFACES(ifp_auxn) {
-            if(if_up(ifp_auxn))
-                continue;
+        FOR_ALL_INTERFACES_UP(ifp_auxn) {
             send_multicast_request(ifp_auxn, prefix, plen, src_prefix, src_plen);
         }
         return;
@@ -1765,10 +1760,10 @@ send_multicast_request(struct interface *ifp,
             if(neigh->ifp == ifp) {
                 send_request(&neigh->buf, prefix, plen,
                              src_prefix, src_plen);
-            } else {
-                send_request(&ifp->buf, prefix, plen, src_prefix, src_plen);
             }
         }
+    } else {
+        send_request(&ifp->buf, prefix, plen, src_prefix, src_plen);
     }
 }
 
@@ -1840,9 +1835,7 @@ send_multicast_multihop_request(struct interface *ifp,
 {
     if(ifp == NULL) {
         struct interface *ifp_aux;
-        FOR_ALL_INTERFACES(ifp_aux) {
-            if(!if_up(ifp_aux))
-                continue;
+        FOR_ALL_INTERFACES_UP(ifp_aux) {
             send_multicast_multihop_request(ifp_aux,
                                             prefix, plen, src_prefix, src_plen,
                                             seqno, id, hop_count);
@@ -1903,8 +1896,7 @@ send_request_resend(const unsigned char *prefix, unsigned char plen,
                       id, neigh->ifp, resend_delay);
     } else {
         struct interface *ifp;
-        FOR_ALL_INTERFACES(ifp) {
-	    if(!if_up(ifp)) continue;
+        FOR_ALL_INTERFACES_UP(ifp) {
             send_multihop_request(&ifp->buf, prefix, plen, src_prefix, src_plen,
                                   seqno, id, 127);
 	}

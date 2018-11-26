@@ -564,9 +564,7 @@ main(int argc, char **argv)
 
     /* Make some noise so that others notice us, and send retractions in
        case we were restarted recently */
-    FOR_ALL_INTERFACES(ifp) {
-        if(!if_up(ifp))
-            continue;
+    FOR_ALL_INTERFACES_UP(ifp) {
         /* Apply jitter before we send the first message. */
         usleep(roughly(10000));
         gettime(&now);
@@ -574,9 +572,7 @@ main(int argc, char **argv)
         send_wildcard_retraction(ifp);
     }
 
-    FOR_ALL_INTERFACES(ifp) {
-        if(!if_up(ifp))
-            continue;
+    FOR_ALL_INTERFACES_UP(ifp) {
         usleep(roughly(10000));
         gettime(&now);
         send_hello(ifp);
@@ -669,9 +665,7 @@ main(int argc, char **argv)
                     sleep(1);
                 }
             } else {
-                FOR_ALL_INTERFACES(ifp) {
-                    if(!if_up(ifp))
-                        continue;
+                FOR_ALL_INTERFACES_UP(ifp) {
                     if(ifp->ifindex == sin6.sin6_scope_id) {
                         parse_packet((unsigned char*)&sin6.sin6_addr, ifp,
                                      receive_buffer, rc);
@@ -759,9 +753,7 @@ main(int argc, char **argv)
             source_expiry_time = now.tv_sec + roughly(300);
         }
 
-        FOR_ALL_INTERFACES(ifp) {
-            if(!if_up(ifp))
-                continue;
+        FOR_ALL_INTERFACES_UP(ifp) {
             if(timeval_compare(&now, &ifp->hello_timeout) >= 0)
                 send_hello(ifp);
             if(timeval_compare(&now, &ifp->update_timeout) >= 0)
@@ -776,9 +768,7 @@ main(int argc, char **argv)
                  do_resend(i);
 	}
 
-        FOR_ALL_INTERFACES(ifp) {
-            if(!if_up(ifp))
-                continue;
+        FOR_ALL_INTERFACES_UP(ifp) {
             if(ifp->buf.timeout.tv_sec != 0) {
                 if(timeval_compare(&now, &ifp->buf.timeout) >= 0) {
                     flushupdates(ifp);
@@ -808,9 +798,7 @@ main(int argc, char **argv)
     /* We need to flush so interface_up won't try to reinstall. */
     flush_all_routes();
 
-    FOR_ALL_INTERFACES(ifp) {
-        if(!if_up(ifp))
-            continue;
+    FOR_ALL_INTERFACES_UP(ifp) {
         send_wildcard_retraction(ifp);
         /* Make sure that we expire quickly from our neighbours'
            association caches. */
@@ -819,9 +807,7 @@ main(int argc, char **argv)
         usleep(roughly(1000));
         gettime(&now);
     }
-    FOR_ALL_INTERFACES(ifp) {
-        if(!if_up(ifp))
-            continue;
+    FOR_ALL_INTERFACES_UP(ifp) {
         /* Make sure they got it. */
         send_wildcard_retraction(ifp);
         send_hello_noihu(ifp, 1);
@@ -882,9 +868,7 @@ main(int argc, char **argv)
     exit(1);
 
  fail:
-    FOR_ALL_INTERFACES(ifp) {
-        if(!if_up(ifp))
-            continue;
+    FOR_ALL_INTERFACES_UP(ifp) {
         interface_up(ifp, 0);
     }
     kernel_setup_socket(0);

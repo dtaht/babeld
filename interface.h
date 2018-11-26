@@ -142,6 +142,15 @@ if_up(struct interface *ifp)
     return !!(ifp->flags & IF_UP);
 }
 
+static inline struct interface *
+get_up(struct interface *ifp) {
+    while (ifp && !if_up(ifp))
+	ifp = ifp->next;
+    return ifp;
+}
+
+#define FOR_ALL_INTERFACES_UP(_ifp) for(_ifp = get_up(interfaces); _ifp; _ifp = get_up(_ifp->next))
+
 struct interface *add_interface(char *ifname, struct interface_conf *if_conf);
 int flush_interface(char *ifname);
 unsigned jitter(struct buffered *buf, int urgent);
